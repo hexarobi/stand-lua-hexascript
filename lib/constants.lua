@@ -1,0 +1,140 @@
+local Constants = {
+
+    VEHICLE_MAX_OPTIONS = {
+        WHEEL_TYPES = 13,
+        WINDOW_TINTS = 6,
+    },
+    
+    VEHICLE_CLASSES = {
+        COMPACTS = 0,
+        SEDANS = 1,
+        SUVS = 2,
+        COUPES = 3,
+        MUSCLE = 4,
+        SPORTSCLASSICS = 5,
+        SPORTS = 6,
+        SUPER = 7,
+        MOTORCYCLES = 8,
+        OFFROAD = 9,
+        INDUSTRIAL = 10,
+        UTILITY = 11,
+        VANS = 12,
+        CYCLES = 13,
+        BOATS = 14,
+        HELICOPTERS = 15,
+        PLANES = 16,
+        SERVICE = 17,
+        EMERGENCY = 18,
+        MILITARY = 19,
+        COMMERCIAL = 20,
+        TRAINS = 21,
+    },
+
+    VEHICLE_WHEEL_TYPES = {
+        STOCK = -1,
+        SPORT = 0,
+        MUSCLE = 1,
+        LOWRIDER = 2,
+        SUV = 3,
+        OFFROAD = 4,
+        TUNER = 5,
+        BIKE = 6,
+        HIGHEND = 7,
+        BENNY = 8,
+        BENNY2 = 9,
+        F1 = 10,
+        STREET = 11,
+    },
+
+    VEHICLE_PAINT_TYPES = {
+        NORMAL = 0,
+        METALLIC = 1,
+        PEARL = 2,
+        MATTE = 3,
+        METAL = 4,
+        CHROME = 5,
+    },
+
+    VEHICLE_MOD_TYPES = {
+        MOD_SPOILER = 0,
+        MOD_FRONTBUMPER = 1,
+        MOD_REARBUMPER = 2,
+        MOD_SIDESKIRT = 3,
+        MOD_EXHAUST = 4,
+        MOD_CHASSIS = 5, --Or roll cage
+        MOD_GRILLE = 6,
+        MOD_HOOD = 7,
+        MOD_FENDER = 8,
+        MOD_RIGHTFENDER = 9,
+        MOD_ROOF = 10,
+        MOD_ENGINE = 11,
+        MOD_BRAKES = 12,
+        MOD_TRANSMISSION = 13,
+        MOD_HORNS = 14,
+        MOD_SUSPENSION = 15,
+        MOD_ARMOR = 16,
+        MOD_UNK17 = 17,
+        MOD_TURBO = 18,
+        MOD_UNK19 = 19,
+        MOD_TIRESMOKE = 20,
+        MOD_UNK21 = 21,
+        MOD_XENONLIGHTS = 22,
+        MOD_FRONTWHEELS = 23,
+        MOD_BACKWHEELS = 24, --Bikes only
+
+        -- Benny's
+        MOD_PLATEHOLDER = 25,
+        MOD_VANITY_PLATES  = 26,
+        MOD_TRIM = 27,
+        MOD_ORNAMENTS = 28,
+        MOD_DASHBOARD = 29,
+        MOD_DIAL = 30,
+        MOD_DOOR_SPEAKER = 31,
+        MOD_SEATS = 32,
+        MOD_STEERINGWHEEL = 33,
+        MOD_SHIFTER_LEAVERS = 34,
+        MOD_PLAQUES = 35,
+        MOD_SPEAKERS = 36,
+        MOD_TRUNK = 37,
+        MOD_HYDRULICS = 38,
+        MOD_ENGINE_BLOCK = 39,
+        MOD_AIR_FILTER = 40,
+        MOD_STRUTS = 41,
+        MOD_ARCH_COVER = 42,
+        MOD_AERIALS = 43,
+        MOD_TRIM = 44,
+        MOD_TANK = 45,
+        MOD_WINDOWS = 46,
+        MOD_UNK47 = 47,
+        MOD_LIVERY = 48
+    },
+
+    VEHICLE_PLATE_TYPES = {
+        MODERN = 0,
+        BLACK = 1,
+        BLUE = 2,
+        CLASSIC = 3,
+        EXEMPT = 4,
+        YANKTON = 5
+    },
+
+    VEHICLE_HEADLIGHT_COLORS = {
+        STOCK = -1,
+        WHITE = 0,
+        BLUE = 1,
+        LIGHTBLUE = 2,
+        GREEN = 3,
+        LIME = 4,
+        YELLOW = 5,
+        GOLD = 6,
+        ORANGE = 7,
+        RED = 8,
+        PINK = 9,
+        HOTPINK = 10,
+        PURPLE = 11,
+        BLACK = 12
+    }
+
+}
+
+return Constants
