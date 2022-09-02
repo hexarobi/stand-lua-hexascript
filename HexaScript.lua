@@ -1,4 +1,4 @@
--- HexaScript v0.4
+-- HexaScript v0.5
 -- a Lua script the Stand Mod Menu for GTA5
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
@@ -8,9 +8,9 @@ util.require_natives(1651208000)
 local constants = require("constants")
 local colorsRGB = require("colors")
 
-CHAT_CONTROL_CHARACTER = "!"
+local CHAT_CONTROL_CHARACTER = "!"
 
-VEHICLE_MODEL_SHORTCUTS = {
+local VEHICLE_MODEL_SHORTCUTS = {
     moc = "trailerlarge",
     terrorbyte = "terbyte",
     ramp = "dune4",
@@ -33,8 +33,6 @@ VEHICLE_MODEL_SHORTCUTS = {
     hellfire = "gauntlet4",
     luxordeluxe = "luxor2",
     swiftdeluxe = "swift2",
-    f15 = "lazer",
-    harrier = "hydra",
     antiaircraft = "trailersmall2",
     superdiamond = "superd",
     zz8 = "ruiner4",
@@ -49,7 +47,6 @@ VEHICLE_MODEL_SHORTCUTS = {
     jesterrr = "jester4",
     buffalostx = "buffalo4",
     vigerozx = "vigero2",
-    --sprunk = "buffalo3",
     ["10f"] = "tenf",
     ["10fwide"] = "tenf2",
 }
@@ -658,7 +655,7 @@ local function get_on_off(command)
 end
 
 local function get_on_off_string(command)
-    return (get_on_off(command) and "on" or "off")
+    return (get_on_off(command) and "ON" or "OFF")
 end
 
 local chat_commands = {}
@@ -1014,6 +1011,15 @@ chat_commands.add{
 }
 
 chat_commands.add{
+    command="unstick",
+    help="Try to get unstuck from infinite loading screen",
+    func=function(pid, commands)
+        menu.trigger_commands("givesh " .. players.get_name(pid))
+        help_message(pid, "Attempting to unstick you, good luck")
+    end
+}
+
+chat_commands.add{
     command="allguns",
     help="Get all possible weapons",
     func=function(pid, commands)
@@ -1025,7 +1031,7 @@ chat_commands.add{
     command="autoheal",
     help="Automatically heal any damage as quickly as possible",
     func=function(pid, commands)
-        local enabled_string = get_on_off_string(commands[2])
+        local enabled_string = get_on_off_string((commands and commands[2]) or "on")
         menu.trigger_commands("autoheal " .. players.get_name(pid) .. " " .. enabled_string)
         help_message(pid, "Autoheal " .. enabled_string)
     end
@@ -1096,7 +1102,6 @@ for _, passthrough_command in passthrough_commands do
         if commands and commands[2] ~= nil then
             command_string = command_string .. " " .. commands[2]
         end
-        util.toast(command_string)
         menu.trigger_commands(command_string)
         if passthrough_command.help_message then
             help_message(pid, passthrough_command.help_message)
