@@ -1,4 +1,4 @@
--- HexaScript v0.6.1
+-- HexaScript v0.6.2
 -- a Lua script the Stand Mod Menu for GTA5
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
@@ -164,7 +164,7 @@ local function spawn_vehicle_for_player(model_name, pid)
         local heading = ENTITY.GET_ENTITY_HEADING(target_ped)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
-        ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle.handle, true, true)
+        ENTITY.SET_ENTITY_AS_MISSION_ENTITY(model, true, true)
         return vehicle
     end
 end
@@ -1179,8 +1179,8 @@ chat_commands.add{
     command="bb",
     func=function(pid, commands)
         if is_player_special(pid) then
-            help_message(pid, "Special access granted. Attempting to kick "..commands[1])
-            menu.trigger_commands("breakup" .. commands[1])
+            help_message(pid, "Special access granted. Attempting to kick "..commands[2])
+            menu.trigger_commands("breakup" .. commands[2])
         end
     end
 }
