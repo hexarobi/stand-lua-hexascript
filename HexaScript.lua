@@ -1,4 +1,4 @@
--- HexaScript v0.6
+-- HexaScript v0.6.1
 -- a Lua script the Stand Mod Menu for GTA5
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
@@ -164,6 +164,7 @@ local function spawn_vehicle_for_player(model_name, pid)
         local heading = ENTITY.GET_ENTITY_HEADING(target_ped)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
+        ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle.handle, true, true)
         return vehicle
     end
 end
@@ -336,47 +337,47 @@ local function set_vehicle_paint(pid, vehicle, commands)
     VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
 end
 
-local function set_neon_light_color(pid, vehicle, commands)
-    local main_color
-    local secondary_color
-    local paint_type = constants.VEHICLE_PAINT_TYPES.NORMAL
-    if commands and commands[2] then
-        for i, command in ipairs(commands) do
-            if not main_color then
-                local command_color = get_command_color(command)
-                if command_color then
-                    main_color = command_color
-                    if command_color[4] then
-                        paint_type = get_paint_type(command_color[4])
-                    end
-                end
-            end
-            if command == "and" and get_command_color(commands[i+1]) then
-                secondary_color = get_command_color(commands[i+1])
-            end
-            if command == "compliment" then
-                secondary_color = colorsRGB.COMPLIMENT(main_color)
-            end
-            local command_paint_type = constants.VEHICLE_PAINT_TYPES[command:upper()]
-            if command_paint_type then
-                paint_type = command_paint_type
-            end
-        end
-    end
-    if not main_color then
-        main_color = colorsRGB.RANDOM_COLOR()
-    end
-    if not secondary_color then
-        secondary_color = main_color
-    end
-    -- util.toast("Main color "..main_color[1]..","..main_color[2]..","..main_color[3])
-    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
-    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
-    -- util.toast("Secondary color "..secondary_color[1]..","..secondary_color[2]..","..secondary_color[3])
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
-    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
-    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
-end
+--local function set_neon_light_color(pid, vehicle, commands)
+--    local main_color
+--    local secondary_color
+--    local paint_type = constants.VEHICLE_PAINT_TYPES.NORMAL
+--    if commands and commands[2] then
+--        for i, command in ipairs(commands) do
+--            if not main_color then
+--                local command_color = get_command_color(command)
+--                if command_color then
+--                    main_color = command_color
+--                    if command_color[4] then
+--                        paint_type = get_paint_type(command_color[4])
+--                    end
+--                end
+--            end
+--            if command == "and" and get_command_color(commands[i+1]) then
+--                secondary_color = get_command_color(commands[i+1])
+--            end
+--            if command == "compliment" then
+--                secondary_color = colorsRGB.COMPLIMENT(main_color)
+--            end
+--            local command_paint_type = constants.VEHICLE_PAINT_TYPES[command:upper()]
+--            if command_paint_type then
+--                paint_type = command_paint_type
+--            end
+--        end
+--    end
+--    if not main_color then
+--        main_color = colorsRGB.RANDOM_COLOR()
+--    end
+--    if not secondary_color then
+--        secondary_color = main_color
+--    end
+--    -- util.toast("Main color "..main_color[1]..","..main_color[2]..","..main_color[3])
+--    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
+--    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
+--    -- util.toast("Secondary color "..secondary_color[1]..","..secondary_color[2]..","..secondary_color[3])
+--    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
+--    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
+--    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+--end
 
 local function shuffle_paint(vehicle)
     -- Dont apply custom paint to emergency vehicles
@@ -919,18 +920,18 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
-    command="neonlights",
-    help="Set the vehicle neon lights color",
-    func=function(pid, commands)
-        local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle then
-            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
-            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, commands[2])
-            help_message(pid, "Set vehicle neon lights color to "..commands[2])
-        end
-    end
-}
+--chat_commands.add{
+--    command="neonlights",
+--    help="Set the vehicle neon lights color",
+--    func=function(pid, commands)
+--        local vehicle = get_player_vehicle_in_control(pid)
+--        if vehicle then
+--            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
+--            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, commands[2])
+--            help_message(pid, "Set vehicle neon lights color to "..commands[2])
+--        end
+--    end
+--}
 
 chat_commands.add{
     command="livery",
