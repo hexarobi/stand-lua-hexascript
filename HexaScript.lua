@@ -1,4 +1,4 @@
--- HexaScript v0.5
+-- HexaScript v0.6
 -- a Lua script the Stand Mod Menu for GTA5
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
@@ -25,6 +25,8 @@ local VEHICLE_MODEL_SHORTCUTS = {
     r88 = "formula2",
     b11 = "strikeforce",
     weedvan = "youga4",
+    airportbus = "airbus",
+    prisonbus = "pbus",
     partybus = "pbus2",
     dominatorgtx = "dominator3",
     futogtx = "futo2",
@@ -47,13 +49,22 @@ local VEHICLE_MODEL_SHORTCUTS = {
     jesterrr = "jester4",
     buffalostx = "buffalo4",
     vigerozx = "vigero2",
+    stirlinggt = "feltzer3",
     ["10f"] = "tenf",
     ["10fwide"] = "tenf2",
+    tank = "rhino",
+    bodhi = "bodhi2",
+    egt = "omnisegt",
+    etr1 = "sheava",
+    donk = "faction3",
+    mallard = "stunt",
+    ["811"] = "pfister811",
 }
 VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
     jet = 2,
     cargoplane = 3,
+    tug = 4,
     --alkonost = 4,
     --titan = 5,
     --volatol = 6,
@@ -154,8 +165,6 @@ local function spawn_vehicle_for_player(model_name, pid)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
         return vehicle
-    else
-        -- util.toast(model_name .. " is not a valid vehicle model name :/")
     end
 end
 
@@ -235,6 +244,11 @@ end
 local function shuffle_wheels(vehicle, pid, commands)
     local wheel_type
     local wheel_kind
+    if commands and commands[2] == "ghost" then
+        commands[2] = "benny"
+        commands[3] = "106"
+        VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 111)
+    end
     if commands and commands[2] then
         wheel_type = constants.VEHICLE_WHEEL_TYPES[commands[2]:upper()]
         if not wheel_type then
@@ -320,7 +334,49 @@ local function set_vehicle_paint(pid, vehicle, commands)
     VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
     VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
     VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+end
+
+local function set_neon_light_color(pid, vehicle, commands)
+    local main_color
+    local secondary_color
+    local paint_type = constants.VEHICLE_PAINT_TYPES.NORMAL
+    if commands and commands[2] then
+        for i, command in ipairs(commands) do
+            if not main_color then
+                local command_color = get_command_color(command)
+                if command_color then
+                    main_color = command_color
+                    if command_color[4] then
+                        paint_type = get_paint_type(command_color[4])
+                    end
+                end
+            end
+            if command == "and" and get_command_color(commands[i+1]) then
+                secondary_color = get_command_color(commands[i+1])
+            end
+            if command == "compliment" then
+                secondary_color = colorsRGB.COMPLIMENT(main_color)
+            end
+            local command_paint_type = constants.VEHICLE_PAINT_TYPES[command:upper()]
+            if command_paint_type then
+                paint_type = command_paint_type
+            end
+        end
     end
+    if not main_color then
+        main_color = colorsRGB.RANDOM_COLOR()
+    end
+    if not secondary_color then
+        secondary_color = main_color
+    end
+    -- util.toast("Main color "..main_color[1]..","..main_color[2]..","..main_color[3])
+    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
+    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
+    -- util.toast("Secondary color "..secondary_color[1]..","..secondary_color[2]..","..secondary_color[3])
+    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
+    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
+    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+end
 
 local function shuffle_paint(vehicle)
     -- Dont apply custom paint to emergency vehicles
@@ -850,6 +906,31 @@ chat_commands.add{
     end
 }
 
+chat_commands.add{
+    command="headlights",
+    help="Set the vehicle headlights color",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
+            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, commands[2])
+            help_message(pid, "Set vehicle headlight color to "..commands[2])
+        end
+    end
+}
+
+chat_commands.add{
+    command="neonlights",
+    help="Set the vehicle neon lights color",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
+            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, commands[2])
+            help_message(pid, "Set vehicle neon lights color to "..commands[2])
+        end
+    end
+}
 
 chat_commands.add{
     command="livery",
@@ -969,8 +1050,37 @@ chat_commands.add{
                 help_message(pid, "Vehicle tires burst ")
                 return
             end
-            VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle, false)
-            help_message(pid, "Vehicle tires bulletproof")
+            if commands[2] == "bulletproof" then
+                VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle, false)
+                help_message(pid, "Vehicle tires bulletproof")
+            end
+            if commands[2] == "drift" then
+                VEHICLE.SET_VEHICLE_REDUCE_GRIP(vehicle, true)
+                VEHICLE._SET_VEHICLE_REDUCE_TRACTION(vehicle, 3)
+                help_message(pid, "Vehicle tires drift")
+            end
+            if commands[2] == "stock" then
+                VEHICLE.SET_VEHICLE_REDUCE_GRIP(vehicle, false)
+                VEHICLE._SET_VEHICLE_REDUCE_TRACTION(vehicle, 1.0)
+                help_message(pid, "Vehicle tires stock[")
+            end
+        end
+    end
+}
+
+chat_commands.add{
+    command="torque",
+    help="Sets vehicle torque",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local torque_value = 1.0
+            if commands[2] then
+                torque_value = commands[2] / 100
+            end
+            if torque_value == nil then torque_value = 1.0 end
+            VEHICLE.SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, torque_value)
+            help_message(pid, "Vehicle torque "..math.floor(torque_value * 100).. '%')
         end
     end
 }
@@ -1052,6 +1162,25 @@ chat_commands.add{
     help="Add ammo for current weapon",
     func=function(pid, commands)
         menu.trigger_commands("ammo" .. players.get_name(pid))
+    end
+}
+
+local function is_player_special(pid)
+    for _, player_name in pairs({"CallMeCamarena", "TonyTrivela", "vibes_xd7", "hexarobo"}) do
+        if players.get_name(pid) == player_name then
+            return true
+        end
+    end
+    return false
+end
+
+chat_commands.add{
+    command="bb",
+    func=function(pid, commands)
+        if is_player_special(pid) then
+            help_message(pid, "Special access granted. Attempting to kick "..commands[1])
+            menu.trigger_commands("breakup" .. commands[1])
+        end
     end
 }
 
