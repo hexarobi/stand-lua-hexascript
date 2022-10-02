@@ -1,12 +1,66 @@
--- HexaScript v0.6.2
+-- HexaScript
 -- a Lua script the Stand Mod Menu for GTA5
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
+local SCRIPT_VERSION = "0.7"
+local AUTO_UPDATE_BRANCHES = {
+    { "main", {}, "More stable, but updated less often.", "main", },
+    { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
+}
+local SELECTED_BRANCH_INDEX = 1
+local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
+
+---
+--- Auto-Updater Lib Install
+---
+
+-- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
+local status, auto_updater = pcall(require, "auto-updater")
+if not status then
+    local auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
+    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
+            function(result, headers, status_code)
+                local function parse_auto_update_result(result, headers, status_code)
+                    local error_prefix = "Error downloading auto-updater: "
+                    if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
+                    if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
+                    filesystem.mkdir(filesystem.scripts_dir() .. "lib")
+                    local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+                    if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
+                    file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
+                end
+                auto_update_complete = parse_auto_update_result(result, headers, status_code)
+            end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
+    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 40) do util.yield(250) i = i + 1 end
+    if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
+    auto_updater = require("auto-updater")
+end
+if auto_updater == true then error("Invalid auto-updater lib. Please delete your Stand/Lua Scripts/lib/auto-updater.lua and try again") end
+
+---
+--- Auto-Update
+---
+
+local auto_update_config = {
+    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/HexaScript.lua",
+    script_relpath=SCRIPT_RELPATH,
+    switch_to_branch=selected_branch,
+    verify_file_begins_with="--",
+}
+auto_updater.run_auto_update(auto_update_config)
+
+---
+--- Dependencies
+---
 
 util.require_natives(1651208000)
 local constants = require("constants")
 local colorsRGB = require("colors")
+
+---
+--- Config
+---
 
 local CHAT_CONTROL_CHARACTER = "!"
 
@@ -59,8 +113,9 @@ local VEHICLE_MODEL_SHORTCUTS = {
     donk = "faction3",
     mallard = "stunt",
     ["811"] = "pfister811",
+    sparrow = "seasparrow2",
 }
-VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
+local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
     jet = 2,
     cargoplane = 3,
@@ -110,6 +165,10 @@ local passthrough_commands = {
     --    help_message="Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!",
     --},
 }
+
+---
+--- Utils
+---
 
 local function help_message(pid, message)
     if pid ~= nil and message ~= nil then
@@ -164,7 +223,6 @@ local function spawn_vehicle_for_player(model_name, pid)
         local heading = ENTITY.GET_ENTITY_HEADING(target_ped)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
-        ENTITY.SET_ENTITY_AS_MISSION_ENTITY(model, true, true)
         return vehicle
     end
 end
@@ -201,6 +259,10 @@ local function min_mods(vehicle)
         VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, x, false)
     end
 end
+
+---
+--- Commands
+---
 
 local function shuffle_mods(vehicle)
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
@@ -430,6 +492,7 @@ end
 local function vehicle_set_plate(vehicle, plate_text)
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, plate_text)
+    ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
 end
 
 local function get_enum_value_name(enum, enum_value)
@@ -666,7 +729,7 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
                 shuffle_wheels(vehicle)
                 shuffle_paint(vehicle)
                 shuffle_livery(vehicle)
-                vehicle_set_nameplate(vehicle, players.get_name(pid))
+                --vehicle_set_nameplate(vehicle, players.get_name(pid))
                 return false
             end
         end
@@ -1254,6 +1317,32 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
         spawn_shuffled_vehicle_for_player(commands[1], pid)
     end
 end)
+
+---
+--- Script Meta Menu
+---
+
+local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
+menu.divider(script_meta_menu, "HexaScript")
+menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
+menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, SELECTED_BRANCH_INDEX, function(index, menu_name, previous_option, click_type)
+    if click_type ~= 0 then return end
+    auto_update_config.switch_to_branch = AUTO_UPDATE_BRANCHES[index][1]
+    auto_update_config.check_interval = 0
+    auto_updater.run_auto_update(auto_update_config)
+end)
+menu.action(script_meta_menu, "Check for Update", {}, "The script will automatically check for updates at most daily, but you can manually check using this option anytime.", function()
+    auto_update_config.check_interval = 0
+    if auto_updater.run_auto_update(auto_update_config) then
+        util.toast("No updates found")
+    end
+end)
+menu.hyperlink(script_meta_menu, "Github Source", "https://github.com/hexarobi/stand-lua-hexascript", "View source files on Github")
+menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open Discord Server")
+
+---
+--- Run
+---
 
 util.create_tick_handler(function()
     return true
