@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.7"
+local SCRIPT_VERSION = "0.8"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -983,18 +983,45 @@ chat_commands.add{
     end
 }
 
---chat_commands.add{
---    command="neonlights",
---    help="Set the vehicle neon lights color",
---    func=function(pid, commands)
---        local vehicle = get_player_vehicle_in_control(pid)
---        if vehicle then
---            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
---            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, commands[2])
---            help_message(pid, "Set vehicle neon lights color to "..commands[2])
---        end
---    end
---}
+chat_commands.add{
+    command="neonlights",
+    help="Set the vehicle neon lights color",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local color = get_command_color(commands[2])
+            if not color then
+                help_message(pid, "Invalid color")
+                return
+            end
+            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
+            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
+            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
+            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
+            VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle, color[1], color[2], color[3])
+            help_message(pid, "Set vehicle neon lights color to "..commands[2])
+        end
+    end
+}
+
+
+chat_commands.add{
+    command="tiresmoke",
+    help="Set the vehicle tire smoke color",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local color = get_command_color(commands[2])
+            if not color then
+                help_message(pid, "Invalid color")
+                return
+            end
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, 22, true)
+            VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(vehicle, color[1], color[2], color[3])
+            help_message(pid, "Set vehicle tire smoke color to "..commands[2])
+        end
+    end
+}
 
 chat_commands.add{
     command="livery",
@@ -1347,3 +1374,4 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 util.create_tick_handler(function()
     return true
 end)
+
