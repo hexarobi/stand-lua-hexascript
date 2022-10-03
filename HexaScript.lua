@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.8"
+local SCRIPT_VERSION = "0.9"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -398,48 +398,6 @@ local function set_vehicle_paint(pid, vehicle, commands)
     VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
     VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
 end
-
---local function set_neon_light_color(pid, vehicle, commands)
---    local main_color
---    local secondary_color
---    local paint_type = constants.VEHICLE_PAINT_TYPES.NORMAL
---    if commands and commands[2] then
---        for i, command in ipairs(commands) do
---            if not main_color then
---                local command_color = get_command_color(command)
---                if command_color then
---                    main_color = command_color
---                    if command_color[4] then
---                        paint_type = get_paint_type(command_color[4])
---                    end
---                end
---            end
---            if command == "and" and get_command_color(commands[i+1]) then
---                secondary_color = get_command_color(commands[i+1])
---            end
---            if command == "compliment" then
---                secondary_color = colorsRGB.COMPLIMENT(main_color)
---            end
---            local command_paint_type = constants.VEHICLE_PAINT_TYPES[command:upper()]
---            if command_paint_type then
---                paint_type = command_paint_type
---            end
---        end
---    end
---    if not main_color then
---        main_color = colorsRGB.RANDOM_COLOR()
---    end
---    if not secondary_color then
---        secondary_color = main_color
---    end
---    -- util.toast("Main color "..main_color[1]..","..main_color[2]..","..main_color[3])
---    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
---    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
---    -- util.toast("Secondary color "..secondary_color[1]..","..secondary_color[2]..","..secondary_color[3])
---    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
---    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
---    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
---end
 
 local function shuffle_paint(vehicle)
     -- Dont apply custom paint to emergency vehicles
@@ -970,15 +928,45 @@ chat_commands.add{
     end
 }
 
+local headlight_color_name_map = {
+    default = -1,
+    white = 0,
+    blue = 1,
+    electricblue = 2,
+    mintgreen = 3,
+    green = 4,
+    limegreen = 4,
+    yellow = 5,
+    gold = 6,
+    orange = 7,
+    red = 8,
+    pink = 9,
+    ponypink = 9,
+    hotpink = 10,
+    purple = 11,
+    blacklight = 12
+}
+
 chat_commands.add{
     command="headlights",
     help="Set the vehicle headlights color",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
+        local color_number
         if vehicle then
+            if type(commands[2]) == "number" then
+                local color_number = commands[2]
+            else
+                local color_name = commands[2]
+                if headlight_color_name_map[color_name] ~= nil then color_number = headlight_color_name_map[color_name] end
+            end
+            if color_number < -1 or color_number > 12 then
+                help_message(pid, "Invalid color")
+                return
+            end
             VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
-            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, commands[2])
-            help_message(pid, "Set vehicle headlight color to "..commands[2])
+            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, color_number)
+            help_message(pid, "Set vehicle headlight color to "..color_number)
         end
     end
 }
