@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.9"
+local SCRIPT_VERSION = "0.9.1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -952,14 +952,10 @@ chat_commands.add{
     help="Set the vehicle headlights color",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
-        local color_number
         if vehicle then
-            if type(commands[2]) == "number" then
-                local color_number = commands[2]
-            else
-                local color_name = commands[2]
-                if headlight_color_name_map[color_name] ~= nil then color_number = headlight_color_name_map[color_name] end
-            end
+            local color_number = tonumber(commands[2])
+            local color_name = commands[2]
+            if headlight_color_name_map[color_name] ~= nil then color_number = headlight_color_name_map[color_name] end
             if color_number < -1 or color_number > 12 then
                 help_message(pid, "Invalid color")
                 return
