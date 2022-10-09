@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.1"
+local SCRIPT_VERSION = "0.10.2"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -65,6 +65,7 @@ local colorsRGB = require("colors")
 local config = {
     chat_control_character = "!",
     num_allowed_spawned_vehicles_per_player = 3,
+    auto_spectate_far_away_players = true,
 }
 
 local CHAT_CONTROL_CHARACTER = "!"
@@ -571,6 +572,10 @@ local function get_player_vehicle_in_control(pid, opts)
         return 0
     end
     if vehicle == 0 and target_ped ~= my_ped and dist > 340000 and not was_spectating then
+        if not config.auto_spectate_far_away_players then
+            help_message(pid, "Sorry, you are too far away right now, please try again later")
+            return
+        end
         util.toast("Player is too far, auto-spectating for upto 3s.")
         show_busyspinner("Player is too far, auto-spectating for upto 3s.")
         NETWORK.NETWORK_SET_IN_SPECTATOR_MODE(true, target_ped)
@@ -1516,6 +1521,11 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
         spawn_shuffled_vehicle_for_player(commands[1], pid)
     end
 end)
+
+local menu_options = menu.list(menu.my_root(), "Options")
+menu.toggle(menu_options, "Auto-Spectate Far Away Players", {}, "If enabled, you will automatically spectate players who issue commands from far away. Without this far away players will get an error when issuing commands.", function(toggle)
+    config.auto_spectate_far_away_players = toggle
+end, config.auto_spectate_far_away_players)
 
 ---
 --- Script Meta Menu
