@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10"
+local SCRIPT_VERSION = "0.10.1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -431,6 +431,34 @@ local function set_vehicle_paint(pid, vehicle, commands)
     VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
     VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
     VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+end
+
+local function set_vehicle_secondary_paint(pid, vehicle, commands)
+    local main_color
+    local secondary_color
+    local paint_type = constants.VEHICLE_PAINT_TYPES.NORMAL
+    if commands and commands[2] then
+        for i, command in ipairs(commands) do
+            if not main_color then
+                local command_color = get_command_color(command)
+                if command_color then
+                    secondary_color = command_color
+                    if command_color[4] then
+                        paint_type = get_paint_type(command_color[4])
+                    end
+                end
+            end
+            local command_paint_type = constants.VEHICLE_PAINT_TYPES[command:upper()]
+            if command_paint_type then
+                paint_type = command_paint_type
+            end
+        end
+    end
+    if not secondary_color then
+        secondary_color = colorsRGB.RANDOM_COLOR()
+    end
+    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
+    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
 end
 
 local function shuffle_paint(vehicle)
@@ -918,6 +946,22 @@ chat_commands.add{
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             set_vehicle_paint(pid, vehicle, commands)
+        end
+    end
+}
+
+chat_commands.add{
+    command="paint2",
+    help={
+        "Sets your vehicle secondary paint. Allows for color names and paint type options",
+        "Paint types: NORMAL, METALLIC, PEARL, MATTE, METAL, CHROME",
+        "Example: !paint2 blue, !paint2 metallic green",
+        "Hex RGB color codes are allowed. Example: !paint2 #ff0000"
+    },
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            set_vehicle_secondary_paint(pid, vehicle, commands)
         end
     end
 }
