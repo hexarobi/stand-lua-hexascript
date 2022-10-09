@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.9.1"
+local SCRIPT_VERSION = "0.10"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -62,6 +62,11 @@ local colorsRGB = require("colors")
 --- Config
 ---
 
+local config = {
+    chat_control_character = "!",
+    num_allowed_spawned_vehicles_per_player = 3,
+}
+
 local CHAT_CONTROL_CHARACTER = "!"
 
 local VEHICLE_MODEL_SHORTCUTS = {
@@ -114,6 +119,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     mallard = "stunt",
     ["811"] = "pfister811",
     sparrow = "seasparrow2",
+    ultralight = "microlight",
 }
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
@@ -214,15 +220,43 @@ local function load_hash(hash)
     end
 end
 
+local players_spawned_vehicles = {}
+
+local function get_player_spawned_vehicles(pid)
+    for _, player_spawned_vehicles in pairs(players_spawned_vehicles) do
+        if player_spawned_vehicles.pid == pid then
+            return player_spawned_vehicles
+        end
+    end
+    local new_player_spawned_vehicles = {pid=pid, vehicles={}}
+    table.insert(players_spawned_vehicles, new_player_spawned_vehicles)
+    return new_player_spawned_vehicles
+end
+
+local function despawn_for_player(pid)
+    local player_spawned_vehicles = get_player_spawned_vehicles(pid)
+    if #player_spawned_vehicles.vehicles >= config.num_allowed_spawned_vehicles_per_player then
+        entities.delete_by_handle(player_spawned_vehicles.vehicles[1].handle)
+        table.remove(player_spawned_vehicles.vehicles, 1)
+    end
+end
+
+local function spawn_for_player(pid, vehicle)
+    local player_spawned_vehicles = get_player_spawned_vehicles(pid)
+    table.insert(player_spawned_vehicles.vehicles, {handle=vehicle})
+end
+
 local function spawn_vehicle_for_player(model_name, pid)
     local model = util.joaat(model_name)
     if STREAMING.IS_MODEL_VALID(model) and STREAMING.IS_MODEL_A_VEHICLE(model) then
+        despawn_for_player(pid)
         load_hash(model)
         local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
         local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(target_ped, 0.0, 4.0, 0.5)
         local heading = ENTITY.GET_ENTITY_HEADING(target_ped)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
+        spawn_for_player(pid, vehicle)
         return vehicle
     end
 end
@@ -916,14 +950,56 @@ chat_commands.add{
     end
 }
 
+local function get_vehicle_color_from_command(command)
+    for _, vehicle_color in pairs(constants.VEHICLE_COLORS) do
+        if vehicle_color.index == tonumber(command) or vehicle_color.name:lower() == command then
+            return vehicle_color
+        end
+    end
+end
+
+local function set_extra_color(vehicle, pearl_color, wheel_color)
+    local current_pearl_color = memory.alloc(8)
+    local current_wheel_color = memory.alloc(8)
+    VEHICLE.GET_VEHICLE_EXTRA_COLOURS(vehicle, current_pearl_color, current_wheel_color)
+    pearl_color = get_vehicle_color_from_command(pearl_color)
+    wheel_color = get_vehicle_color_from_command(wheel_color)
+    if pearl_color == nil then pearl_color = {index=current_pearl_color} end
+    if wheel_color == nil then wheel_color = {index=current_wheel_color} end
+    VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, pearl_color.index, wheel_color.index)
+    memory.free(current_pearl_color)
+    memory.free(current_wheel_color)
+end
+
 chat_commands.add{
     command="wheelcolor",
     help="Set the vehicles wheel color",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
-            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, commands[2])
-            help_message(pid, "Set vehicle wheel color to "..commands[2])
+            local color = get_vehicle_color_from_command(commands[2])
+            if color then
+                set_extra_color(vehicle, nil, color)
+                help_message(pid, "Set vehicle wheel color to "..color.name.." ("..color.index..")")
+            else
+                help_message(pid, "Invalid color")
+            end
+        end
+    end
+}
+
+chat_commands.add{
+    command="pearl",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local color = get_vehicle_color_from_command(commands[2])
+            if color then
+                set_extra_color(vehicle, color, nil)
+                help_message(pid, "Set vehicle pearl color to "..color.name.." ("..color.index..")")
+            else
+                help_message(pid, "Invalid color")
+            end
         end
     end
 }
@@ -1030,6 +1106,21 @@ chat_commands.add{
 }
 
 chat_commands.add{
+    command="blinkers",
+    help="Set the vehicles blinkers",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local side = 0
+            if commands[2] == "left" then side = 1 end
+            local state = true
+            if commands[3] == "off" then state = false end
+            VEHICLE.SET_VEHICLE_INDICATOR_LIGHTS(vehicle, side, state)
+        end
+    end
+}
+
+chat_commands.add{
     command="plate",
     help="Set the vehicles plate text",
     func=function(pid, commands)
@@ -1111,6 +1202,35 @@ chat_commands.add{
     end
 }
 
+local window_tint_map = {
+    none = -1,
+    black = 0,
+    dark = 1,
+    light = 2,
+    stock = 3,
+    limo = 4,
+    green = 5,
+}
+
+chat_commands.add{
+    command="windowtint",
+    help="Sets suspension height on the vehicle",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local tint_level = tonumber(commands[2])
+            local tint_name = commands[2]
+            if window_tint_map[tint_name] ~= nil then tint_level = window_tint_map[tint_name] end
+            if tint_level < -1 or tint_level > 6 then
+                help_message(pid, "Invalid tint")
+                return
+            end
+            VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, tint_level)
+            help_message(pid, "Window tint "..tint_level)
+        end
+    end
+}
+
 chat_commands.add{
     command="tires",
     help="Sets tires on the vehicle",
@@ -1139,6 +1259,30 @@ chat_commands.add{
                 VEHICLE._SET_VEHICLE_REDUCE_TRACTION(vehicle, 1.0)
                 help_message(pid, "Vehicle tires stock[")
             end
+        end
+    end
+}
+
+chat_commands.add{
+    command="driftmode",
+    help="Sets vehicle drift mode",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            vehicle_mods_set_max_performance(vehicle)
+            local drift_mode = get_on_off_string(commands[2])
+            if drift_mode == "ON" then
+                util.toast("bursting")
+                VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle, true)
+                VEHICLE.SET_VEHICLE_TYRE_BURST(vehicle, 2, false, 1000.0)
+                VEHICLE.SET_VEHICLE_TYRE_BURST(vehicle, 3, false, 1000.0)
+            else
+                util.toast("fixing")
+                VEHICLE.SET_VEHICLE_TYRE_BURST(vehicle, 2, false, 0.0)
+                VEHICLE.SET_VEHICLE_TYRE_BURST(vehicle, 3, false, 0.0)
+                VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle, false)
+            end
+            help_message(pid, "Drift mode "..drift_mode)
         end
     end
 }
@@ -1358,4 +1502,3 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 util.create_tick_handler(function()
     return true
 end)
-
