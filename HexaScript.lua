@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.4"
+local SCRIPT_VERSION = "0.10.5"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1403,7 +1403,7 @@ chat_commands.add{
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             local enabled_string = get_on_off_string(commands[2])
-            local enabled = enabled_string == "on"
+            local enabled = (enabled_string == "ON")
             ENTITY.SET_ENTITY_COMPLETELY_DISABLE_COLLISION(vehicle, enabled, true)
             ENTITY.SET_ENTITY_COLLISION(vehicle, not enabled, false)
             help_message(pid, "No clip "..enabled_string)
