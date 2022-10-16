@@ -1403,7 +1403,9 @@ chat_commands.add{
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             local enabled_string = get_on_off_string(commands[2])
-            ENTITY.SET_ENTITY_COMPLETELY_DISABLE_COLLISION(vehicle, enabled_string == "on", true)
+            local enabled = enabled_string == "on"
+            ENTITY.SET_ENTITY_COMPLETELY_DISABLE_COLLISION(vehicle, enabled, true)
+            ENTITY.SET_ENTITY_COLLISION(vehicle, not enabled, false)
             help_message(pid, "No clip "..enabled_string)
         end
     end
