@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.2"
+local SCRIPT_VERSION = "0.10.4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -47,16 +47,34 @@ local auto_update_config = {
     script_relpath=SCRIPT_RELPATH,
     switch_to_branch=selected_branch,
     verify_file_begins_with="--",
+    dependencies={
+        {
+            name="constants",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/constants.lua",
+            script_relpath="lib/hexascript/constants.lua",
+            verify_file_begins_with="--",
+        },
+        {
+            name="colors",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/colors.lua",
+            script_relpath="lib/hexascript/colors.lua",
+        },
+    }
 }
 auto_updater.run_auto_update(auto_update_config)
+local libs = {}
+for _, dependency in pairs(auto_update_config.dependencies) do
+    libs[dependency.name] = dependency.loaded_lib
+end
+
+local constants = libs.constants
+local colorsRGB = libs.colors
 
 ---
 --- Dependencies
 ---
 
 util.require_natives(1651208000)
-local constants = require("constants")
-local colorsRGB = require("colors")
 
 ---
 --- Config
@@ -1378,6 +1396,19 @@ chat_commands.add{
     end
 }
 
+chat_commands.add{
+    command="noclip",
+    help="Sets vehicle no clip",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local enabled_string = get_on_off_string(commands[2])
+            ENTITY.SET_ENTITY_COMPLETELY_DISABLE_COLLISION(vehicle, enabled_string == "on", true)
+            help_message(pid, "No clip "..enabled_string)
+        end
+    end
+}
+
 -- Self Commands
 
 chat_commands.add{
@@ -1434,7 +1465,7 @@ chat_commands.add{
 }
 
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "TonyTrivela", "vibes_xd7", "hexarobo"}) do
+    for _, player_name in pairs({"CallMeCamarena", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122"}) do
         if players.get_name(pid) == player_name then
             return true
         end
