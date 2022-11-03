@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.5"
+local SCRIPT_VERSION = "0.10.6"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -139,6 +139,9 @@ local VEHICLE_MODEL_SHORTCUTS = {
     ["811"] = "pfister811",
     sparrow = "seasparrow2",
     ultralight = "microlight",
+    s80rr = "s80",
+    re7b = "le7b",
+    x80 = "prototipo",
 }
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
@@ -265,13 +268,14 @@ local function spawn_for_player(pid, vehicle)
     table.insert(player_spawned_vehicles.vehicles, {handle=vehicle})
 end
 
-local function spawn_vehicle_for_player(model_name, pid)
+local function spawn_vehicle_for_player(model_name, pid, offset)
     local model = util.joaat(model_name)
     if STREAMING.IS_MODEL_VALID(model) and STREAMING.IS_MODEL_A_VEHICLE(model) then
         despawn_for_player(pid)
         load_hash(model)
         local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
-        local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(target_ped, 0.0, 4.0, 0.5)
+        if offset == nil then offset = {x=0, y=4.0, z=0.5} end
+        local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(target_ped, offset.x, offset.y, offset.z)
         local heading = ENTITY.GET_ENTITY_HEADING(target_ped)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
@@ -282,6 +286,7 @@ end
 
 local function vehicle_set_mod_max_value(vehicle, vehicle_mod)
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
+    if vehicle_mod == 34 then max = -1 end  -- Don't set shifters to avoid crash
     VEHICLE.SET_VEHICLE_MOD(vehicle, vehicle_mod, max)
 end
 
@@ -901,13 +906,7 @@ chat_commands.add{
 chat_commands.add{
     command="gift",
     help={
-       "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
-       "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
-       "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
-       "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
-       "#5 To enable your currently driven vehicle to be parked in a garage say !gift",
-       "#6 Drive your vehicle into your garage and when prompted, choose YES to replace a free car with your spawned car",
-       "#7 If successful the spawned car should now be listed as deliverable when you call your Mechanic"
+       "Fill a garage with FREE cars from legendary motor. Use !gift and replace free cars with spawned cars. For more details try !help moregift"
     },
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -920,9 +919,30 @@ chat_commands.add{
 }
 
 chat_commands.add{
+    command="moregift",
+    help={
+        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
+        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
+        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
+        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
+        "#5 Say !gift to enable your vehicle to be driven into a garage",
+        "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
+        "#7 Take vehicle to LS customs and make sure it has insurance",
+        "#8 If something doesnt work, try resetting personal vehicle by driving an owned car out and back into garage",
+        "#9 If garage door is blocked, its probably invisible cars left in the way, clear them with !ramp",
+    },
+}
+
+chat_commands.add{
     command="gift2",
     help={
-        "Alternative gift command"
+        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
+        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
+        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
+        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
+        "#5 Say !gift to enable your vehicle to be driven into a garage",
+        "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
+        "#7 Take vehicle to LS customs and make sure it has insurance"
     },
     func=function(pid, commands)
         gift_vehicle_to_player(pid)
@@ -939,6 +959,37 @@ chat_commands.add{
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             spawn_shuffled_vehicle_for_player(commands[2], pid)
+        end
+    end
+}
+
+local function request_control_once(entity)
+    if not NETWORK.NETWORK_IS_IN_SESSION() then
+        return true
+    end
+    local netId = NETWORK.NETWORK_GET_NETWORK_ID_FROM_ENTITY(entity)
+    NETWORK.SET_NETWORK_ID_CAN_MIGRATE(netId, true)
+    return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
+end
+
+chat_commands.add{
+    command="fly",
+    help="Fly a plane",
+    func=function(pid, commands)
+        local vehicle_model_name = "lazer"
+        if commands[2] ~= nil then
+            vehicle_model_name = commands[2]
+        end
+        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
+        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
+            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid, {x=0, y=4, z=30})
+            if vehicle then
+                vehicle_mods_set_max_performance(vehicle)
+                shuffle_vehicle(vehicle)
+                request_control_once(vehicle)
+                PED.SET_PED_INTO_VEHICLE(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), vehicle, -1)
+                VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 100)
+            end
         end
     end
 }
@@ -1467,7 +1518,7 @@ chat_commands.add{
 }
 
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122"}) do
+    for _, player_name in pairs({"CallMeCamarena", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_"}) do
         if players.get_name(pid) == player_name then
             return true
         end
