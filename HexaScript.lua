@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.6"
+local SCRIPT_VERSION = "0.10.7"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -52,18 +52,23 @@ local auto_update_config = {
             name="constants",
             source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/constants.lua",
             script_relpath="lib/hexascript/constants.lua",
+            is_required=true,
             verify_file_begins_with="--",
         },
         {
             name="colors",
             source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/colors.lua",
             script_relpath="lib/hexascript/colors.lua",
+            is_required=true,
         },
     }
 }
 auto_updater.run_auto_update(auto_update_config)
 local libs = {}
 for _, dependency in pairs(auto_update_config.dependencies) do
+    if dependency.loaded_lib == nil then
+        util.toast("Error loading lib "..dependency.name, TOAST_ALL)
+    end
     libs[dependency.name] = dependency.loaded_lib
 end
 
@@ -163,6 +168,164 @@ local passthrough_commands = {
     "sprunkrain",
     "spawnfor",
     "ecola",
+    {
+        command="canada",
+        help="Spawn a canada jet",
+        outbound_command="canada",
+        requires_player_name=true,
+    },
+    {
+        command="eu",
+        help="Spawn a eu jet",
+        outbound_command="eu",
+        requires_player_name=true,
+    },
+    {
+        command="argentina",
+        help="Spawn a argentina jet",
+        outbound_command="argentina",
+        requires_player_name=true,
+    },
+    {
+        command="brazil",
+        help="Spawn a brazil jet",
+        outbound_command="brazil",
+        requires_player_name=true,
+    },
+    {
+        command="china",
+        help="Spawn a china jet",
+        outbound_command="china",
+        requires_player_name=true,
+    },
+    {
+        command="colombia",
+        help="Spawn a colombia jet",
+        outbound_command="colombia",
+        requires_player_name=true,
+    },
+    {
+        command="france",
+        help="Spawn a france jet",
+        outbound_command="france",
+        requires_player_name=true,
+    },
+    {
+        command="germany",
+        help="Spawn a germany jet",
+        outbound_command="germany",
+        requires_player_name=true,
+    },
+    {
+        command="italy",
+        help="Spawn a italy jet",
+        outbound_command="italy",
+        requires_player_name=true,
+    },
+    {
+        command="japan",
+        help="Spawn a japan jet",
+        outbound_command="japan",
+        requires_player_name=true,
+    },
+    {
+        command="mexico",
+        help="Spawn a mexico jet",
+        outbound_command="mexico",
+        requires_player_name=true,
+    },
+    {
+        command="spain",
+        help="Spawn a spain jet",
+        outbound_command="spain",
+        requires_player_name=true,
+    },
+    {
+        command="sweden",
+        help="Spawn a sweden jet",
+        outbound_command="sweden",
+        requires_player_name=true,
+    },
+    {
+        command="uk",
+        help="Spawn a uk jet",
+        outbound_command="uk",
+        requires_player_name=true,
+    },
+    {
+        command="usa",
+        help="Spawn a usa jet",
+        outbound_command="usa",
+        requires_player_name=true,
+    },
+
+    {
+        command="australia",
+        help="Spawn a australia jet",
+        outbound_command="australia",
+        requires_player_name=true,
+    },
+    {
+        command="croatia",
+        help="Spawn a croatia jet",
+        outbound_command="croatia",
+        requires_player_name=true,
+    },
+    {
+        command="ireland",
+        help="Spawn a ireland jet",
+        outbound_command="ireland",
+        requires_player_name=true,
+    },
+    {
+        command="newzealand",
+        help="Spawn a newzealand jet",
+        outbound_command="newzealand",
+        requires_player_name=true,
+    },
+    {
+        command="norway",
+        help="Spawn a norway jet",
+        outbound_command="norway",
+        requires_player_name=true,
+    },
+    {
+        command="poland",
+        help="Spawn a poland jet",
+        outbound_command="poland",
+        requires_player_name=true,
+    },
+    {
+        command="portugal",
+        help="Spawn a portugal jet",
+        outbound_command="portugal",
+        requires_player_name=true,
+    },
+    {
+        command="scotland",
+        help="Spawn a scotland jet",
+        outbound_command="scotland",
+        requires_player_name=true,
+    },
+    {
+        command="southkorea",
+        help="Spawn a southkorea jet",
+        outbound_command="southkorea",
+        requires_player_name=true,
+    },
+    {
+        command="wales",
+        help="Spawn a wales jet",
+        outbound_command="wales",
+        requires_player_name=true,
+    },
+
+    {
+        command="op3",
+        help="Spawn a op3",
+        outbound_command="op3",
+        requires_player_name=true,
+    },
     {
         command="animal",
         help="Turns into a random animal",
@@ -1518,7 +1681,7 @@ chat_commands.add{
 }
 
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_"}) do
+    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C"}) do
         if players.get_name(pid) == player_name then
             return true
         end
@@ -1566,6 +1729,34 @@ chat_commands.add{
         local enabled_string = get_on_off_string(commands[2])
         menu.trigger_commands("ceopay " .. players.get_name(pid) .. " " .. enabled_string)
         help_message(pid, "CEOPay " .. enabled_string .. ". Remember, you must be a member (not CEO) of an org to get paid.")
+    end
+}
+
+local shitbox_vehicles = {
+    "kanjo",
+    "previon",
+    "sultan2",
+    "futo2",
+    "remus",
+    "calico",
+    "rt3000",
+    "penumbra2",
+    "club",
+    "zr350",
+    "euros",
+    "gb200",
+}
+chat_commands.add{
+    command="crapbox",
+    func=function(pid, commands)
+        local shitbox_vehicle =  shitbox_vehicles[math.random(#shitbox_vehicles)]
+        local vehicle = spawn_vehicle_for_player(shitbox_vehicle, pid)
+        if vehicle then
+            vehicle_mods_set_max_performance(vehicle)
+            --max_mods(vehicle)
+            --shuffle_wheels(vehicle)
+            --shuffle_paint(vehicle)
+        end
     end
 }
 
