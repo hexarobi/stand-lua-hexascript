@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.7"
+local SCRIPT_VERSION = "0.10.8"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -135,6 +135,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     stirlinggt = "feltzer3",
     ["10f"] = "tenf",
     ["10fwide"] = "tenf2",
+    ["10f2"] = "tenf2",
     tank = "rhino",
     bodhi = "bodhi2",
     egt = "omnisegt",
@@ -168,6 +169,12 @@ local passthrough_commands = {
     "sprunkrain",
     "spawnfor",
     "ecola",
+    {
+        command="policebarrage",
+        help="Spawn a police barrage",
+        outbound_command="policebarrage",
+        requires_player_name=true,
+    },
     {
         command="canada",
         help="Spawn a canada jet",
