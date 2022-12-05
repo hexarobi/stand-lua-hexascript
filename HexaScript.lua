@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.10.8"
+local SCRIPT_VERSION = "0.11"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -169,168 +169,14 @@ local passthrough_commands = {
     "sprunkrain",
     "spawnfor",
     "ecola",
+--    {
+--        command="casinojoin",
+--        outbound_command="casinojoin",
+--        requires_player_name=true,
+--    },
     {
-        command="policebarrage",
-        help="Spawn a police barrage",
-        outbound_command="policebarrage",
-        requires_player_name=true,
-    },
-    {
-        command="canada",
-        help="Spawn a canada jet",
-        outbound_command="canada",
-        requires_player_name=true,
-    },
-    {
-        command="eu",
-        help="Spawn a eu jet",
-        outbound_command="eu",
-        requires_player_name=true,
-    },
-    {
-        command="argentina",
-        help="Spawn a argentina jet",
-        outbound_command="argentina",
-        requires_player_name=true,
-    },
-    {
-        command="brazil",
-        help="Spawn a brazil jet",
-        outbound_command="brazil",
-        requires_player_name=true,
-    },
-    {
-        command="china",
-        help="Spawn a china jet",
-        outbound_command="china",
-        requires_player_name=true,
-    },
-    {
-        command="colombia",
-        help="Spawn a colombia jet",
-        outbound_command="colombia",
-        requires_player_name=true,
-    },
-    {
-        command="france",
-        help="Spawn a france jet",
-        outbound_command="france",
-        requires_player_name=true,
-    },
-    {
-        command="germany",
-        help="Spawn a germany jet",
-        outbound_command="germany",
-        requires_player_name=true,
-    },
-    {
-        command="italy",
-        help="Spawn a italy jet",
-        outbound_command="italy",
-        requires_player_name=true,
-    },
-    {
-        command="japan",
-        help="Spawn a japan jet",
-        outbound_command="japan",
-        requires_player_name=true,
-    },
-    {
-        command="mexico",
-        help="Spawn a mexico jet",
-        outbound_command="mexico",
-        requires_player_name=true,
-    },
-    {
-        command="spain",
-        help="Spawn a spain jet",
-        outbound_command="spain",
-        requires_player_name=true,
-    },
-    {
-        command="sweden",
-        help="Spawn a sweden jet",
-        outbound_command="sweden",
-        requires_player_name=true,
-    },
-    {
-        command="uk",
-        help="Spawn a uk jet",
-        outbound_command="uk",
-        requires_player_name=true,
-    },
-    {
-        command="usa",
-        help="Spawn a usa jet",
-        outbound_command="usa",
-        requires_player_name=true,
-    },
-
-    {
-        command="australia",
-        help="Spawn a australia jet",
-        outbound_command="australia",
-        requires_player_name=true,
-    },
-    {
-        command="croatia",
-        help="Spawn a croatia jet",
-        outbound_command="croatia",
-        requires_player_name=true,
-    },
-    {
-        command="ireland",
-        help="Spawn a ireland jet",
-        outbound_command="ireland",
-        requires_player_name=true,
-    },
-    {
-        command="newzealand",
-        help="Spawn a newzealand jet",
-        outbound_command="newzealand",
-        requires_player_name=true,
-    },
-    {
-        command="norway",
-        help="Spawn a norway jet",
-        outbound_command="norway",
-        requires_player_name=true,
-    },
-    {
-        command="poland",
-        help="Spawn a poland jet",
-        outbound_command="poland",
-        requires_player_name=true,
-    },
-    {
-        command="portugal",
-        help="Spawn a portugal jet",
-        outbound_command="portugal",
-        requires_player_name=true,
-    },
-    {
-        command="scotland",
-        help="Spawn a scotland jet",
-        outbound_command="scotland",
-        requires_player_name=true,
-    },
-    {
-        command="southkorea",
-        help="Spawn a southkorea jet",
-        outbound_command="southkorea",
-        requires_player_name=true,
-    },
-    {
-        command="wales",
-        help="Spawn a wales jet",
-        outbound_command="wales",
-        requires_player_name=true,
-    },
-
-    {
-        command="op3",
-        help="Spawn a op3",
-        outbound_command="op3",
+        command="casinotp",
+        outbound_command="casinotp",
         requires_player_name=true,
     },
     {
@@ -363,6 +209,48 @@ local passthrough_commands = {
     --    help_message="Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!",
     --},
 }
+
+
+local CONSTRUCTS_DIR = filesystem.stand_dir() .. 'Constructs\\'
+local SPAWNABLE_DIR = CONSTRUCTS_DIR.."/spawnable"
+
+
+local function load_spawnable_names_from_dir(directory)
+    local spawnable_names = {}
+    for _, filepath in ipairs(filesystem.list_files(directory)) do
+        if not filesystem.is_dir(filepath) then
+            local _, filename, ext = string.match(filepath, "(.-)([^\\/]-%.?)[.]([^%.\\/]*)$")
+            table.insert(spawnable_names, filename)
+        end
+    end
+    return spawnable_names
+end
+
+local function load_all_spawnable_names_from_dir(directory)
+    local spawnable_names = load_spawnable_names_from_dir(directory)
+    for _, filepath in ipairs(filesystem.list_files(directory)) do
+        if filesystem.is_dir(filepath) then
+            for _, construct_plan_file in pairs(load_all_spawnable_names_from_dir(filepath)) do
+                table.insert(spawnable_names, construct_plan_file)
+            end
+        end
+    end
+    return spawnable_names
+end
+
+local spawnable_names = load_all_spawnable_names_from_dir(SPAWNABLE_DIR)
+
+for _, spawnable_name in pairs(spawnable_names) do
+    table.insert(
+        passthrough_commands,
+        {
+            command=spawnable_name,
+            help="Spawn a "..spawnable_name,
+            outbound_command=spawnable_name,
+            requires_player_name=true,
+        }
+    )
+end
 
 ---
 --- Utils
@@ -488,6 +376,74 @@ local function min_mods(vehicle)
     end
 end
 
+local function get_player_vehicle_handles()
+    local player_vehicle_handles = {}
+    for _, pid in pairs(players.list()) do
+        local player_ped = PLAYER.GET_PLAYER_PED(pid)
+        local veh = PED.GET_VEHICLE_PED_IS_IN(player_ped, false)
+        if not ENTITY.IS_ENTITY_A_VEHICLE(veh) then
+            veh = PED.GET_VEHICLE_PED_IS_IN(player_ped, true)
+        end
+        if not ENTITY.IS_ENTITY_A_VEHICLE(veh) then
+            veh = 0
+        end
+        if veh then
+            player_vehicle_handles[pid] = veh
+        end
+    end
+    return player_vehicle_handles
+end
+
+local function is_entity_occupied(entity, type, player_vehicle_handles)
+    local occupied = false
+    if type == "VEHICLE" then
+        for _, vehicle_handle in pairs(player_vehicle_handles) do
+            if entity == vehicle_handle then
+                occupied = true
+            end
+        end
+    end
+    return occupied
+end
+
+local function delete_entities_by_range(my_entities, range, type, pid)
+    local player_vehicle_handles = get_player_vehicle_handles()
+    local player_pos = ENTITY.GET_ENTITY_COORDS(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), 1)
+    local count = 0
+    for _, entity in ipairs(my_entities) do
+        local entity_pos = ENTITY.GET_ENTITY_COORDS(entity, 1)
+        local dist = SYSTEM.VDIST(player_pos.x, player_pos.y, player_pos.z, entity_pos.x, entity_pos.y, entity_pos.z)
+        if dist <= range then
+            if not is_entity_occupied(entity, type, player_vehicle_handles) then
+                entities.delete_by_handle(entity)
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+local function delete_nearby_invis_vehicles(pid)
+    local player_vehicle_handles = get_player_vehicle_handles()
+    local player_pos = ENTITY.GET_ENTITY_COORDS(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), 1)
+    local range = 500
+    local count = 0
+    for _, entity in ipairs(entities.get_all_vehicles_as_handles()) do
+        local entity_pos = ENTITY.GET_ENTITY_COORDS(entity, 1)
+        local dist = SYSTEM.VDIST(player_pos.x, player_pos.y, player_pos.z, entity_pos.x, entity_pos.y, entity_pos.z)
+        if dist <= range then
+            if not is_entity_occupied(entity, "VEHICLE", player_vehicle_handles) then
+                if not VEHICLE.IS_VEHICLE_VISIBLE(entity) then
+                    util.toast("Deleting invis vehicle")
+                    entities.delete_by_handle(entity)
+                    count = count + 1
+                end
+            end
+        end
+    end
+    return count
+end
+
 ---
 --- Commands
 ---
@@ -592,6 +548,10 @@ local function set_vehicle_paint(pid, vehicle, commands)
     if commands and commands[2] then
         for i, command in ipairs(commands) do
             if not main_color then
+                --local standard_color = get_vehicle_color_from_command(command)
+                --if standard_color then
+                --
+                --end
                 local command_color = get_command_color(command)
                 if command_color then
                     main_color = command_color
@@ -1041,14 +1001,14 @@ chat_commands.add{
 chat_commands.add{
     command="self",
     help={
-        "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal",
+        "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal, !tpme, !vip",
     }
 }
 
 chat_commands.add{
     command="vehicle",
     help={
-        "VEHICLE commands: !spawn, !gift, !paint, !mods, !wheels, !shuffle, !tune",
+        "VEHICLE commands: !spawn, !invincible, !gift, !paint, !mods, !wheels, !shuffle, !tune, !headlights, !neonlights, !wheelcolor, !tires",
         "!livery, !plate, !platetype, !horn, !repair",
     }
 }
@@ -1066,10 +1026,11 @@ chat_commands.add{
 chat_commands.add{
     command="roulette",
     help={
-        "HOW TO PLAY RIGGED ROULETTE: The number will always (almost) be 1. Max bets on \"1\" and \"1st 12\" spaces for best payout.",
-        "If you did it right you should win 330k on a 55k bet. The number may come up as 0 as people join or leave table.",
-        "You can play on any table but purple tables pay 10x more. Buy a Penthouse, or join someones Org, to play as VIP",
-        "The casino will cut you off for an hour after winning 4mil, so lose after each 3mil to keep going.",
+        "HOW TO PLAY RIGGED ROULETTE: Enter the casino (!casinotp) get chips from cashier then enter the TABLE GAMES section.",
+        "Find the HIGH LIMIT purple tables and take a seat at roulette. If you need VIP access join an org (!vip) or buy a penthouse.",
+        "The ball will always land on 1. Press TAB for max bet, then click red \"1\" space once and the \"1st 12\" space five times.",
+        "If you did it right you will bet 55k and win 330k per spin.",
+        "You will get cut off for an hour after winning 13 in a row ($4mil), avoid by placing a small losing bet every 10 spins ($3mil)",
     }
 }
 
@@ -1081,6 +1042,7 @@ chat_commands.add{
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
+            --delete_nearby_invis_vehicles(pid)
             local command_string = "gift " .. players.get_name(pid)
             menu.trigger_commands(command_string)
             help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
@@ -1099,7 +1061,7 @@ chat_commands.add{
         "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
         "#7 Take vehicle to LS customs and make sure it has insurance",
         "#8 If something doesnt work, try resetting personal vehicle by driving an owned car out and back into garage",
-        "#9 If garage door is blocked, its probably invisible cars left in the way, clear them with !ramp",
+        --"#9 If garage door is blocked, its probably invisible cars left in the way, clear them with !ramp",
     },
 }
 
@@ -1117,6 +1079,35 @@ chat_commands.add{
     func=function(pid, commands)
         gift_vehicle_to_player(pid)
         help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
+    end
+}
+
+chat_commands.add{
+    command="vip",
+    help="Request an org invite, useful for ceopay or VIP at casino.",
+    func=function(pid, commands)
+        -- Thanks to Totaw Annihiwation for this script event!
+        util.trigger_script_event(1 << pid, {
+            -1129846248,
+            players.user(),
+            4,
+            10000, -- wage?
+            0,
+            0,
+            0,
+            0,
+            memory.read_int(memory.script_global(1920255 + 9)), -- f_8
+            memory.read_int(memory.script_global(1920255 + 10)), -- f_9
+        })
+    end
+}
+
+chat_commands.add{
+    command="cleanup",
+    help="Clear unoccupied vehicles from immediate vicinity. Useful for clearing invis vehicles when gifting.",
+    func=function(pid, commands)
+        local num_deleted = delete_entities_by_range(entities.get_all_vehicles_as_handles(), 100, "VEHICLE", pid)
+        help_message(pid, "Deleted "..num_deleted.." nearby vehicles")
     end
 }
 
@@ -1632,6 +1623,20 @@ chat_commands.add{
     end
 }
 
+chat_commands.add{
+    command="invincible",
+    help="Set vehicle to god mode and prevent all damage",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local enabled_string = get_on_off_string((commands and commands[2]) or "on")
+            local enabled = (enabled_string == "ON")
+            ENTITY.SET_ENTITY_INVINCIBLE(vehicle, enabled)
+            help_message(pid, "Vehicle invincibility " .. enabled_string)
+        end
+    end
+}
+
 -- Self Commands
 
 chat_commands.add{
@@ -1639,6 +1644,31 @@ chat_commands.add{
     help="Teleport to a nearby apartment. Good for when stuck in loading screens",
     func=function(pid, commands)
         menu.trigger_commands("aptme " .. players.get_name(pid))
+    end
+}
+
+chat_commands.add{
+    command="tp",
+    help="Teleport to your waypoint.",
+    func=function(pid, commands)
+        -- Copied from ACJokerScript
+        local x, y, z, b = players.get_waypoint(pid)
+        if HUD.IS_WAYPOINT_ACTIVE() then
+            local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
+            HUD.SET_WAYPOINT_OFF()
+            HUD.SET_NEW_WAYPOINT(x, y)
+            if pid == players.user() then
+                menu.trigger_commands("tpwp")
+            else
+                menu.trigger_commands("WPTP".. players.get_name(pid))
+            end
+            util.yield(1500)
+            HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+        else
+            HUD.SET_NEW_WAYPOINT(x, y)
+            menu.trigger_commands("WPTP".. players.get_name(pid))
+            HUD.SET_WAYPOINT_OFF()
+        end
     end
 }
 
@@ -1794,7 +1824,7 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
     if string.starts(message_text, CHAT_CONTROL_CHARACTER) then
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
-            if commands[1] == chat_command.command and chat_command.func then
+            if commands[1] == chat_command.command:lower() and chat_command.func then
                 chat_command.func(pid, commands)
                 return
             end
