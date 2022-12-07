@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.11.1"
+local SCRIPT_VERSION = "0.11.2"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -164,7 +164,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     reaver = "reever",
     cabrio = "cogcabrio",
     ["370z"] = "euros",
-    drag = "hakuchou2",[]
+    drag = "hakuchou2",
     ramp2 = "dune5",
     mini = "issi2",
     tb = "terbyte",
