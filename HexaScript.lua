@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.11"
+local SCRIPT_VERSION = "0.11.1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -148,7 +148,30 @@ local VEHICLE_MODEL_SHORTCUTS = {
     s80rr = "s80",
     re7b = "le7b",
     x80 = "prototipo",
+    -- Thanks EndGame for additional aliases!
+    d10 = "coquette4",
+    xxr = "entity2",
+    bug = "weevil",
+    rsx = "italirsx",
+    stx = "buffalo4",
+    gtx = "dominator3",
+    asp = "dominator7",
+    gtt = "dominator8",
+    dod = "dukes2",
+    tank2 = "khanjali",
+    tm02 = "khanjali",
+    tank3 = "minitank",
+    reaver = "reever",
+    cabrio = "cogcabrio",
+    ["370z"] = "euros",
+    drag = "hakuchou2",[]
+    ramp2 = "dune5",
+    mini = "issi2",
+    tb = "terbyte",
+    lf22 = "starling",
+    fh1 = "hunter",
 }
+
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
     jet = 2,
