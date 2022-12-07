@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.11.2"
+local SCRIPT_VERSION = "0.12"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -171,7 +171,6 @@ local VEHICLE_MODEL_SHORTCUTS = {
     lf22 = "starling",
     fh1 = "hunter",
 }
-
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
     jet = 2,
@@ -796,119 +795,6 @@ function string.starts(String,Start)
     return string.sub(String,1,string.len(Start))==Start
 end
 
-menu.action(menu.my_root(), "Damage Vehicle", {"damagevehicle"}, "", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle, true);
-        VEHICLE.SMASH_VEHICLE_WINDOW(vehicle, 0);
-        VEHICLE.SMASH_VEHICLE_WINDOW(vehicle, 1);
-        VEHICLE.POP_OUT_VEHICLE_WINDSCREEN(vehicle);
-        --VEHICLE.SET_VEHICLE_CAN_BE_VISIBLY_DAMAGED(vehicle, true)
-        --ENTITY.SET_ENTITY_CAN_BE_DAMAGED(vehicle, true)
-        --ENTITY.SET_ENTITY_INVINCIBLE(vehicle, false)
-        -- VEHICLE._SET_VEHICLE_DAMAGE_MODIFIER(vehicle, 0.5)
-        VEHICLE.SET_VEHICLE_DAMAGE(vehicle, 0, 0, 0.33, 1000.0, 300.0, true)
-        -- VEHICLE.GET_VEHICLE_HEALTH_PERCENTAGE(vehicle, )
-        util.toast("damaging vehicle")
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
---menu.action(menu.my_root(), "Policify", {"policify"}, "", function(click_type, pid)
---    local vehicle = get_player_vehicle_in_control(pid)
---    local policify_counter = 0
---    if vehicle then
---        util.create_tick_handler(function()
---            if policify_counter % 20 == 0 then
---                if VEHICLE._GET_VEHICLE_XENON_LIGHTS_COLOR(vehicle) ~= 8 then
---                    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, 8)
---                else
---                    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, 1)
---                end
---            end
---            policify_counter = policify_counter + 1
---        end)
---        vehicle_set_plate(vehicle, players.get_name(pid))
---    end
---end, nil, nil, COMMANDPERM_FRIENDLY)
-
-menu.action(menu.my_root(), "Name Plate", {"nameplate"}, "", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        vehicle_set_plate(vehicle, players.get_name(effective_issuer))
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
-
-local shuffle_list = menu.list(menu.my_root(), "Shuffles")
-
-menu.action(shuffle_list, "Shuffle Spawn", {"shuffle", "s"}, "Spawn car with shuffled options", function(_)
-    menu.show_command_box("shuffle ")
-    util.toast("Enter car name")
-end, function(vehicle_model_name, effective_issuer, pid)
-    if vehicle_model_name then
-        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
-        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
-            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
-            vehicle_mods_set_max_performance(vehicle)
-            shuffle_vehicle(vehicle)
-            vehicle_set_plate(vehicle, players.get_name(pid))
-            return false
-        end
-    end
-end, "shuffle name", COMMANDPERM_FRIENDLY)
-
-menu.action(shuffle_list, "Shuffle Car", {"shufflecar"}, "Shuffle all non-performance options", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        shuffle_vehicle(vehicle)
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
-menu.action(shuffle_list, "Shuffle Mods", {"shufflemods"}, "Shuffle vehicle modifications", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        shuffle_mods(vehicle)
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
-menu.action(shuffle_list, "Shuffle Paint", {"shufflepaint"}, "Shuffle paint and livery", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        shuffle_paint(vehicle)
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
-menu.action(shuffle_list, "Shuffle Wheels", {"shufflewheels"}, "Shuffle wheel category and model", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        shuffle_wheels(vehicle)
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
-menu.action(menu.my_root(), "F1 Wheels", {"f1wheels"}, "", function(click_type, effective_issuer)
-    local vehicle = get_player_vehicle_in_control(effective_issuer)
-    if vehicle then
-        VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
-        VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, 10)
-        VEHICLE.SET_VEHICLE_MOD(vehicle, 23, 25)
-    end
-end, nil, nil, COMMANDPERM_FRIENDLY)
-
-player_menu_actions = function(pId)
-    menu.divider(menu.player_root(pId), "HexaScript")
-
-    menu.action(menu.player_root(pId), "Name Plate", {"nameplate2"}, "", function()
-        local vehicle = get_player_vehicle_in_control(pId)
-        if vehicle then
-            vehicle_set_plate(vehicle, players.get_name(pId))
-        end
-    end, nil, nil, COMMANDPERM_FRIENDLY)
-
-end
-
-players.on_join(player_menu_actions)
-players.dispatch_on_join()
-
 local function strsplit(inputstr, sep)
     if sep == nil then
         sep = "%s"
@@ -937,23 +823,23 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
     end
 end
 
-local function gift_vehicle_to_player(pid)
-    local vehicle = get_player_vehicle_in_control(pid)
-    if vehicle then
-        NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(vehicle);
-        local network_hash = NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid)
-        for i = 1, 1, 50 do
-            --DECORATOR.DECOR_SET_INT(vehicle, "Veh_Modded_By_Player", network_hash)
-            --DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", network_hash)
-            --DECORATOR.DECOR_SET_INT(vehicle, "Previous_Owner", network_hash)
-            --DECORATOR.DECOR_SET_INT(vehicle, "MPBitSet", 0)
-            DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid))
-            DECORATOR.DECOR_SET_INT(vehicle, "PYV_Owner", NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid))
-            DECORATOR.DECOR_SET_INT(vehicle, "PYV_Vehicle", NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid))
-            VEHICLE.SET_VEHICLE_IS_STOLEN(vehicle, false);
-        end
-    end
-end
+--local function gift_vehicle_to_player(pid)
+--    local vehicle = get_player_vehicle_in_control(pid)
+--    if vehicle then
+--        NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(vehicle);
+--        local network_hash = NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid)
+--        for i = 1, 1, 50 do
+--            --DECORATOR.DECOR_SET_INT(vehicle, "Veh_Modded_By_Player", network_hash)
+--            --DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", network_hash)
+--            --DECORATOR.DECOR_SET_INT(vehicle, "Previous_Owner", network_hash)
+--            --DECORATOR.DECOR_SET_INT(vehicle, "MPBitSet", 0)
+--            DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid))
+--            DECORATOR.DECOR_SET_INT(vehicle, "PYV_Owner", NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid))
+--            DECORATOR.DECOR_SET_INT(vehicle, "PYV_Vehicle", NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid))
+--            VEHICLE.SET_VEHICLE_IS_STOLEN(vehicle, false);
+--        end
+--    end
+--end
 
 --local function gift_vehicle_to_player2(pid)
 --    local vehicle = get_player_vehicle_in_control(pid)
@@ -1024,15 +910,15 @@ chat_commands.add{
 chat_commands.add{
     command="self",
     help={
-        "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal, !tpme, !vip",
+        "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal, !tpme, !vip, !unstick, !noclip, !cleanup",
     }
 }
 
 chat_commands.add{
     command="vehicle",
     help={
-        "VEHICLE commands: !spawn, !invincible, !gift, !paint, !mods, !wheels, !shuffle, !tune, !headlights, !neonlights, !wheelcolor, !tires",
-        "!livery, !plate, !platetype, !horn, !repair",
+        "VEHICLE commands: !spawn, !invincible, !gift, !paint, !mods, !wheels, !shuffle, !tune",
+        "!headlights, !neonlights, !wheelcolor, !tires, !livery, !plate, !platetype, !horn, !repair",
     }
 }
 
@@ -1040,10 +926,13 @@ chat_commands.add{
     command="money",
     help={
         "The best way to make money is from running missions and heists! It's more fun and satisfying",
-        "If you want some supplemental income try CEO pay to speed things up, more info: !help ceopay",
+        "For a money boost try CEO pay (30k per min) use !vip for Org invite, then !ceopay",
         "For even bigger boost watch for the casino to be rigged, more info: !help roulette",
         "You can sell !deathbike2 for 1mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
-    }
+    },
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
+    end
 }
 
 chat_commands.add{
@@ -1054,13 +943,16 @@ chat_commands.add{
         "The ball will always land on 1. Press TAB for max bet, then click red \"1\" space once and the \"1st 12\" space five times.",
         "If you did it right you will bet 55k and win 330k per spin.",
         "You will get cut off for an hour after winning 13 in a row ($4mil), avoid by placing a small losing bet every 10 spins ($3mil)",
-    }
+    },
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
+    end
 }
 
 chat_commands.add{
     command="gift",
     help={
-       "Fill a garage with FREE cars from legendary motor. Use !gift and replace free cars with spawned cars. For more details try !help moregift"
+       "Fill a garage with FREE cars from legendary motor. Use !gift and replace free cars with spawned cars. For details try !help gift1"
     },
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1074,36 +966,74 @@ chat_commands.add{
 }
 
 chat_commands.add{
-    command="moregift",
+    command="gift1",
     help={
         "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
         "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
         "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
-        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
-        "#5 Say !gift to enable your vehicle to be driven into a garage",
-        "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
-        "#7 Take vehicle to LS customs and make sure it has insurance",
-        "#8 If something doesnt work, try resetting personal vehicle by driving an owned car out and back into garage",
-        --"#9 If garage door is blocked, its probably invisible cars left in the way, clear them with !ramp",
+        "Once your garage is completely full, continue to next steps with !help gift2"
     },
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
+    end
 }
 
 chat_commands.add{
     command="gift2",
     help={
-        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
-        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
-        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
         "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
         "#5 Say !gift to enable your vehicle to be driven into a garage",
         "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
-        "#7 Take vehicle to LS customs and make sure it has insurance"
+        "If done correctly the vehicle should now be yours. For more tips and troubleshooting try !help gift3"
     },
-    func=function(pid, commands)
-        gift_vehicle_to_player(pid)
-        help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
     end
 }
+
+chat_commands.add{
+    command="gift3",
+    help={
+        "Make sure to purchase insurance at LS Customs for each spawned vehicle, or it might be lost when destroyed.",
+        "If something doesnt work, try resetting personal vehicle by driving an owned car out and back into garage.",
+        "If garage door is blocked by invisible cars, clear them with !ramp or !cleanup",
+    },
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
+    end
+}
+
+--chat_commands.add{
+--    command="moregift",
+--    help={
+--        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
+--        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
+--        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
+--        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
+--        "#5 Say !gift to enable your vehicle to be driven into a garage",
+--        "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
+--        "#7 Take vehicle to LS customs and make sure it has insurance",
+--        "#8 If something doesnt work, try resetting personal vehicle by driving an owned car out and back into garage",
+--        "#9 If garage door is blocked, its probably invisible cars left in the way, clear them with !ramp or !cleanup",
+--    },
+--}
+
+--chat_commands.add{
+--    command="gift2",
+--    help={
+--        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
+--        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
+--        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
+--        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
+--        "#5 Say !gift to enable your vehicle to be driven into a garage",
+--        "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
+--        "#7 Take vehicle to LS customs and make sure it has insurance"
+--    },
+--    func=function(pid, commands)
+--        gift_vehicle_to_player(pid)
+--        help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
+--    end
+--}
 
 chat_commands.add{
     command="vip",
@@ -1783,12 +1713,12 @@ chat_commands.add{
     command="ceopay",
     help={
         "Highly increased payouts from being in a SecuroServ Org",
-        "Does not cost CEO money, but the CEO does not get paid, only the members"
+        "Does not cost CEO money, but the CEO does not get paid, only the members. For invite try !vip"
     },
     func=function(pid, commands)
         local enabled_string = get_on_off_string(commands[2])
         menu.trigger_commands("ceopay " .. players.get_name(pid) .. " " .. enabled_string)
-        help_message(pid, "CEOPay " .. enabled_string .. ". Remember, you must be a member (not CEO) of an org to get paid.")
+        help_message(pid, "CEOPay " .. enabled_string .. ". Remember, you must be a member (not CEO) of an org to get paid. For invite try !vip")
     end
 }
 
@@ -1848,7 +1778,7 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
             if commands[1] == chat_command.command:lower() and chat_command.func then
-                chat_command.func(pid, commands)
+                chat_command.func(pid, commands, chat_command)
                 return
             end
         end
@@ -1891,3 +1821,4 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 util.create_tick_handler(function()
     return true
 end)
+
