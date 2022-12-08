@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b1"
+local SCRIPT_VERSION = "0.13b2"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -108,7 +108,8 @@ local config = {
 local lobby_modes = {
     { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
     { "New", {}, "Create a new empty public session.", "gosolopub" },
-    { "Join a Friend", {}, "Join a friends session.", "go joinafriend" },
+    { "Join Friend", {}, "Join a friends session.", "go joinafriend" },
+    { "Friends Only", {}, "Create a new closed friends only session.", "go closedfriend" },
 }
 
 local VEHICLE_MODEL_SHORTCUTS = {
