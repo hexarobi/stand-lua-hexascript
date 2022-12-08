@@ -3,12 +3,12 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.12"
+local SCRIPT_VERSION = "0.13b1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
-local SELECTED_BRANCH_INDEX = 1
+local SELECTED_BRANCH_INDEX = 2
 local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
 
 ---
@@ -61,6 +61,20 @@ local auto_update_config = {
             script_relpath="lib/hexascript/colors.lua",
             is_required=true,
         },
+        {
+            name="natives-1651208000",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/natives-1651208000.lua",
+            script_relpath="lib/natives-1651208000.lua",
+            verify_file_begins_with="--",
+            is_required=true,
+        },
+        --{
+        --    name="inspect",
+        --    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
+        --    script_relpath="lib/inspect.lua",
+        --    verify_file_begins_with="local",
+        --    is_required=true,
+        --},
     }
 }
 auto_updater.run_auto_update(auto_update_config)
@@ -74,24 +88,28 @@ end
 
 local constants = libs.constants
 local colorsRGB = libs.colors
-
----
---- Dependencies
----
-
-util.require_natives(1651208000)
+--local inspect = libs.inspect
 
 ---
 --- Config
 ---
 
 local config = {
+    afk_mode = false,
+    afk_mode_in_casino = true,
     chat_control_character = "!",
     num_allowed_spawned_vehicles_per_player = 3,
     auto_spectate_far_away_players = true,
+    lobby_mode_index = 1,
+    tick_handler_delay = 60000,
+    announce_delay = 60,
 }
 
-local CHAT_CONTROL_CHARACTER = "!"
+local lobby_modes = {
+    { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
+    { "New", {}, "Create a new empty public session.", "gosolopub" },
+    { "Join a Friend", {}, "Join a friends session.", "go joinafriend" },
+}
 
 local VEHICLE_MODEL_SHORTCUTS = {
     moc = "trailerlarge",
@@ -207,35 +225,14 @@ local passthrough_commands = {
         outbound_command="furry",
         requires_player_name=true,
     },
-    --{
-    --    command="sprunk",
-    --    help="Spawns a sprunkified vehicle and some cans",
-    --    player_command="sprunk",
-    --},
-    --{
-    --    command="sprunkify",
-    --    help="Sprunkify your vehicle!",
-    --}
-    --{
-    --    command="gift",
-    --    help={
-    --        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
-    --        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
-    --        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
-    --        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
-    --        "#5 To enable your currently driven vehicle to be parked in a garage say !gift",
-    --        "#6 Drive your vehicle into your garage and when prompted, choose YES to replace a free car with your spawned car",
-    --        "#7 If successful the spawned car should now be listed as deliverable when you call your Mechanic"
-    --    },
-    --    requires_player_name=true,
-    --    help_message="Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!",
-    --},
 }
 
+---
+--- Constructor Spawnable Constructs Passthrough Commands
+---
 
 local CONSTRUCTS_DIR = filesystem.stand_dir() .. 'Constructs\\'
 local SPAWNABLE_DIR = CONSTRUCTS_DIR.."/spawnable"
-
 
 local function load_spawnable_names_from_dir(directory)
     local spawnable_names = {}
@@ -261,7 +258,6 @@ local function load_all_spawnable_names_from_dir(directory)
 end
 
 local spawnable_names = load_all_spawnable_names_from_dir(SPAWNABLE_DIR)
-
 for _, spawnable_name in pairs(spawnable_names) do
     table.insert(
         passthrough_commands,
@@ -290,16 +286,66 @@ local function help_message(pid, message)
     end
 end
 
-local function is_player_in_casino(pid)
-    local player_pos = players.get_position(pid)
-    -- Casino pos 1100.000, 220.000, -50.000
-    if player_pos.x > 900 and player_pos.x < 1300
-        and player_pos.y > 0 and player_pos.y < 500
-        and player_pos.z > -100 and player_pos.z < 0 then
-        return true
-    end
-    return false
+local function announce_message(message)
+    chat.send_message(message, false, true, true)
 end
+
+---
+--- Casino AFK Mode
+---
+
+local function is_player_within_dimensions(dimensions)
+    local player_pos = ENTITY.GET_ENTITY_COORDS(players.user_ped())
+    return (
+            player_pos.x > dimensions.min.x and player_pos.x < dimensions.max.x
+                    and player_pos.y > dimensions.min.y and player_pos.y < dimensions.max.y
+                    and player_pos.z > dimensions.min.z and player_pos.z < dimensions.max.z
+    )
+end
+
+local function force_roulette_area()
+    if not is_player_within_dimensions({
+        min={
+            x=1135,
+            y=250,
+            z=-52,
+        },
+        max={
+            x=1142,
+            y=260,
+            z=-50,
+        },
+    }) then
+        ENTITY.SET_ENTITY_COORDS(players.user_ped(), 1138.828, 256.55817, -51.035732)
+    end
+end
+
+local function is_player_in_casino()
+    return is_player_within_dimensions({
+        min={
+            x=1073.9967,
+            y=189.58717,
+            z=-53.838943,
+        },
+        max={
+            x=1166.935,
+            y=284.88977,
+            z=-42.28554,
+        },
+    })
+end
+
+
+--local function is_player_in_casino(pid)
+--    local player_pos = players.get_position(pid)
+--    -- Casino pos 1100.000, 220.000, -50.000
+--    if player_pos.x > 900 and player_pos.x < 1300
+--        and player_pos.y > 0 and player_pos.y < 500
+--        and player_pos.z > -100 and player_pos.z < 0 then
+--        return true
+--    end
+--    return false
+--end
 
 local function is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name)
     local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
@@ -417,15 +463,14 @@ local function get_player_vehicle_handles()
 end
 
 local function is_entity_occupied(entity, type, player_vehicle_handles)
-    local occupied = false
     if type == "VEHICLE" then
         for _, vehicle_handle in pairs(player_vehicle_handles) do
             if entity == vehicle_handle then
-                occupied = true
+                return true
             end
         end
     end
-    return occupied
+    return false
 end
 
 local function delete_entities_by_range(my_entities, range, type, pid)
@@ -865,9 +910,6 @@ local function get_on_off_string(command)
     return (get_on_off(command) and "ON" or "OFF")
 end
 
-local chat_commands = {}
-local chat_commands_menu_list = menu.list(menu.my_root(), "Chat Commands")
-
 local function get_menu_action_help(chat_command_options)
     if chat_command_options.help == nil then
         return ""
@@ -878,43 +920,41 @@ local function get_menu_action_help(chat_command_options)
     return chat_command_options.help
 end
 
-chat_commands.add = function(chat_command_options)
+local chat_commands = {}
+
+local function add_chat_command(chat_command_options)
     table.insert(chat_commands, chat_command_options)
-    menu.action(
-        chat_commands_menu_list, chat_command_options.command,
-        {chat_command_options.override_action_command or chat_command_options.command}, get_menu_action_help(chat_command_options),
-        function(click_type, pid)
-            return chat_command_options.func(pid)
-        end
-    )
 end
 
 -- Help Commands
 
-chat_commands.add{
+add_chat_command{
     command="help",
-    func=function(pid, commands)
-        for _, chat_command in ipairs(chat_commands) do
-            if commands[2] == chat_command.command then
-                help_message(pid, chat_command.help)
-                return
+    help={
+        "Welcome! Please don't grief others. For help with a specific command say !help <COMMAND>",
+        "Available command categories: SELF, VEHICLE, MONEY",
+    },
+    func=function(pid, commands, this_chat_command)
+        if type(commands) == "table" then
+            for _, chat_command in ipairs(chat_commands) do
+                if commands[2] == chat_command.command then
+                    help_message(pid, chat_command.help)
+                    return
+                end
             end
         end
-        help_message(pid, {
-            "Welcome! Please don't grief others. For help with a specific command say !help <COMMAND>",
-            "Available command categories: SELF, VEHICLE, MONEY",
-        })
+        help_message(pid, this_chat_command.help)
     end,
 }
 
-chat_commands.add{
+add_chat_command{
     command="self",
     help={
         "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal, !tpme, !vip, !unstick, !noclip, !cleanup",
     }
 }
 
-chat_commands.add{
+add_chat_command{
     command="vehicle",
     help={
         "VEHICLE commands: !spawn, !invincible, !gift, !paint, !mods, !wheels, !shuffle, !tune",
@@ -922,20 +962,17 @@ chat_commands.add{
     }
 }
 
-chat_commands.add{
+add_chat_command{
     command="money",
     help={
         "The best way to make money is from running missions and heists! It's more fun and satisfying",
         "For a money boost try CEO pay (30k per min) use !vip for Org invite, then !ceopay",
         "For even bigger boost watch for the casino to be rigged, more info: !help roulette",
         "You can sell !deathbike2 for 1mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
-    },
-    func=function(pid, commands, chat_command)
-        help_message(pid, chat_command.help)
-    end
+    }
 }
 
-chat_commands.add{
+add_chat_command{
     command="roulette",
     help={
         "HOW TO PLAY RIGGED ROULETTE: Enter the casino (!casinotp) get chips from cashier then enter the TABLE GAMES section.",
@@ -949,14 +986,16 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift",
     help={
-       "Fill a garage with FREE cars from legendary motor. Use !gift and replace free cars with spawned cars. For details try !help gift1"
+       "First fill a garage with FREE cars from Legendary Motor. Use !gift, then drive into garage and REPLACE a free car. For step-by-step instructions use !help gift1"
     },
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle then
+        if vehicle == 0 then
+            help_message(pid, "You must be in a vehicle to use !gift")
+        else
             --delete_nearby_invis_vehicles(pid)
             local command_string = "gift " .. players.get_name(pid)
             menu.trigger_commands(command_string)
@@ -965,7 +1004,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift1",
     help={
         "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
@@ -978,7 +1017,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift2",
     help={
         "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
@@ -991,7 +1030,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift3",
     help={
         "Make sure to purchase insurance at LS Customs for each spawned vehicle, or it might be lost when destroyed.",
@@ -1003,7 +1042,7 @@ chat_commands.add{
     end
 }
 
---chat_commands.add{
+--add_chat_command{
 --    command="moregift",
 --    help={
 --        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
@@ -1018,7 +1057,7 @@ chat_commands.add{
 --    },
 --}
 
---chat_commands.add{
+--add_chat_command{
 --    command="gift2",
 --    help={
 --        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
@@ -1035,7 +1074,7 @@ chat_commands.add{
 --    end
 --}
 
-chat_commands.add{
+add_chat_command{
     command="vip",
     help="Request an org invite, useful for ceopay or VIP at casino.",
     func=function(pid, commands)
@@ -1052,10 +1091,11 @@ chat_commands.add{
             memory.read_int(memory.script_global(1920255 + 9)), -- f_8
             memory.read_int(memory.script_global(1920255 + 10)), -- f_9
         })
+        help_message(pid, "Org invite sent. Please check your phone to accept invite.")
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="cleanup",
     help="Clear unoccupied vehicles from immediate vicinity. Useful for clearing invis vehicles when gifting.",
     func=function(pid, commands)
@@ -1066,7 +1106,7 @@ chat_commands.add{
 
 -- Vehicle Commands
 
-chat_commands.add{
+add_chat_command{
     command="spawn",
     help="Spawn a shuffled vehicle",
     func=function(pid, commands)
@@ -1086,7 +1126,7 @@ local function request_control_once(entity)
     return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
 end
 
-chat_commands.add{
+add_chat_command{
     command="fly",
     help="Fly a plane",
     func=function(pid, commands)
@@ -1108,7 +1148,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="shuffle",
     help="Shuffle your vehicle paint, mods, and wheels",
     func=function(pid, commands)
@@ -1122,7 +1162,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="paint",
     help={
         "Sets your vehicle paint. Allows for color names and paint type options",
@@ -1138,7 +1178,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="paint2",
     help={
         "Sets your vehicle secondary paint. Allows for color names and paint type options",
@@ -1154,7 +1194,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="mods",
     help="Set the vehicles mods",
     func=function(pid, commands)
@@ -1171,7 +1211,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="wheels",
     help="Set the vehicles wheels",
     func=function(pid, commands)
@@ -1203,7 +1243,7 @@ local function set_extra_color(vehicle, pearl_color, wheel_color)
     memory.free(current_wheel_color)
 end
 
-chat_commands.add{
+add_chat_command{
     command="wheelcolor",
     help="Set the vehicles wheel color",
     func=function(pid, commands)
@@ -1220,7 +1260,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="pearl",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1255,7 +1295,7 @@ local headlight_color_name_map = {
     blacklight = 12
 }
 
-chat_commands.add{
+add_chat_command{
     command="headlights",
     help="Set the vehicle headlights color",
     func=function(pid, commands)
@@ -1275,7 +1315,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="neonlights",
     help="Set the vehicle neon lights color",
     func=function(pid, commands)
@@ -1297,7 +1337,7 @@ chat_commands.add{
 }
 
 
-chat_commands.add{
+add_chat_command{
     command="tiresmoke",
     help="Set the vehicle tire smoke color",
     func=function(pid, commands)
@@ -1315,7 +1355,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="livery",
     help="Set the vehicles livery",
     func=function(pid, commands)
@@ -1326,7 +1366,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="horn",
     help="Set the vehicles horn type",
     func=function(pid, commands)
@@ -1337,7 +1377,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="blinkers",
     help="Set the vehicles blinkers",
     func=function(pid, commands)
@@ -1352,7 +1392,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="plate",
     help="Set the vehicles plate text",
     func=function(pid, commands)
@@ -1363,7 +1403,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="platetype",
     help="Set the vehicles plate type",
     func=function(pid, commands)
@@ -1378,7 +1418,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="repair",
     help="Repairs your current vehicle",
     func=function(pid, commands)
@@ -1390,7 +1430,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="clean",
     help="Removed any dirt from your current vehicle",
     func=function(pid, commands)
@@ -1402,7 +1442,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="strip",
     help="Removes any removable extra parts on the vehicle",
     func=function(pid, commands)
@@ -1418,7 +1458,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="suspension",
     help="Sets suspension height on the vehicle",
     func=function(pid, commands)
@@ -1444,7 +1484,7 @@ local window_tint_map = {
     green = 5,
 }
 
-chat_commands.add{
+add_chat_command{
     command="windowtint",
     help="Sets suspension height on the vehicle",
     func=function(pid, commands)
@@ -1463,7 +1503,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="tires",
     help="Sets tires on the vehicle",
     func=function(pid, commands)
@@ -1495,7 +1535,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="driftmode",
     help="Sets vehicle drift mode",
     func=function(pid, commands)
@@ -1519,7 +1559,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="torque",
     help="Sets vehicle torque",
     func=function(pid, commands)
@@ -1536,7 +1576,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="stance",
     help="Lowers suspension on the vehicle",
     func=function(pid, commands)
@@ -1550,7 +1590,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="tune",
     help="Apply maximum performance options",
     func=function(pid, commands)
@@ -1561,7 +1601,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="noclip",
     help="Sets vehicle no clip",
     func=function(pid, commands)
@@ -1576,7 +1616,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="invincible",
     help="Set vehicle to god mode and prevent all damage",
     func=function(pid, commands)
@@ -1592,7 +1632,7 @@ chat_commands.add{
 
 -- Self Commands
 
-chat_commands.add{
+add_chat_command{
     command="tpme",
     help="Teleport to a nearby apartment. Good for when stuck in loading screens",
     func=function(pid, commands)
@@ -1600,7 +1640,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="tp",
     help="Teleport to your waypoint.",
     func=function(pid, commands)
@@ -1625,7 +1665,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="unstick",
     help="Try to get unstuck from infinite loading screen",
     func=function(pid, commands)
@@ -1634,7 +1674,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="allguns",
     help="Get all possible weapons",
     func=function(pid, commands)
@@ -1642,7 +1682,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="autoheal",
     help="Automatically heal any damage as quickly as possible",
     func=function(pid, commands)
@@ -1652,7 +1692,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="bail",
     help="Avoid all wanted levels",
     func=function(pid, commands)
@@ -1662,7 +1702,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="ammo",
     help="Add ammo for current weapon",
     func=function(pid, commands)
@@ -1679,7 +1719,7 @@ local function is_player_special(pid)
     return false
 end
 
-chat_commands.add{
+add_chat_command{
     command="bb",
     func=function(pid, commands)
         if is_player_special(pid) then
@@ -1689,7 +1729,7 @@ chat_commands.add{
     end
 }
 
---chat_commands.add{
+--add_chat_command{
 --    command="animal",
 --    help="Turn into a random animal",
 --    func=function(pid, commands)
@@ -1709,7 +1749,7 @@ chat_commands.add{
 
 -- Money commands
 
-chat_commands.add{
+add_chat_command{
     command="ceopay",
     help={
         "Highly increased payouts from being in a SecuroServ Org",
@@ -1736,7 +1776,7 @@ local shitbox_vehicles = {
     "euros",
     "gb200",
 }
-chat_commands.add{
+add_chat_command{
     command="crapbox",
     func=function(pid, commands)
         local shitbox_vehicle =  shitbox_vehicles[math.random(#shitbox_vehicles)]
@@ -1769,12 +1809,12 @@ for _, passthrough_command in passthrough_commands do
             help_message(pid, passthrough_command.help_message)
         end
     end
-    chat_commands.add(args)
+    add_chat_command(args)
 end
 
 -- Handler for all chat commands
 chat.on_message(function(pid, reserved, message_text, is_team_chat)
-    if string.starts(message_text, CHAT_CONTROL_CHARACTER) then
+    if string.starts(message_text, config.chat_control_character) then
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
             if commands[1] == chat_command.command:lower() and chat_command.func then
@@ -1787,10 +1827,129 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
     end
 end)
 
+---
+--- Lobby Finder
+---
+
+local function is_lobby_empty()
+    local players_list = players.list()
+    local num_players = #players_list
+    --util.toast("Num players "..num_players, TOAST_ALL)
+    return num_players < 3
+end
+
+local function find_new_lobby()
+    local lobby_mode = lobby_modes[config.lobby_mode_index]
+    menu.trigger_commands(lobby_mode[4])
+end
+
+local function enter_casino()
+    menu.trigger_commands("casinotp " .. players.get_name(players.user()))
+end
+
+---
+--- Update Tick
+---
+
+local next_tick_time = util.current_time_millis() + config.tick_handler_delay
+
+local function afk_casino_tick()
+    if not config.afk_mode_in_casino then return end
+    if not is_player_in_casino() then
+        enter_casino()
+    else
+        force_roulette_area()
+    end
+end
+
+local next_announcement_time
+
+local function reset_announcement_timer()
+    next_announcement_time = util.current_time_millis() + (config.announce_delay * 60000)
+end
+reset_announcement_timer()
+
+local function announce_to_lobby()
+    announce_message("Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help")
+    if config.afk_mode_in_casino and is_player_in_casino() then
+        announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !help roulette")
+    end
+    reset_announcement_timer()
+end
+
+
+local function announcement_tick()
+    if util.current_time_millis() > next_announcement_time then
+        announce_to_lobby()
+    end
+end
+
+local function afk_mode_tick()
+    if config.afk_mode then
+        if util.current_time_millis() > next_tick_time then
+            next_tick_time = util.current_time_millis() + config.tick_handler_delay
+            if is_lobby_empty() then
+                find_new_lobby()
+            else
+                afk_casino_tick()
+                announcement_tick()
+            end
+        end
+    end
+    return true
+end
+
+
+---
+--- Root Menu
+---
+
+menu.toggle(menu.my_root(), "AFK Mode", {}, "If enabled, you will auto join new lobby when alone.", function(toggle)
+    config.afk_mode = toggle
+end, config.afk_mode)
+
+local chat_commands_menu_list = menu.list(menu.my_root(), "Chat Commands")
+for _, chat_command in pairs(chat_commands) do
+    if type(chat_command) ~= "table" then
+        util.toast("Invalid chat command "..inspect(chat_command), TOAST_ALL)
+    else
+        menu.action(
+                chat_commands_menu_list,
+                chat_command.command,
+                {chat_command.override_action_command or chat_command.command},
+                get_menu_action_help(chat_command),
+                function(click_type, pid)
+                    if chat_command.func ~= nil then
+                        return chat_command.func(pid, {chat_command.command}, chat_command)
+                    else
+                        return help_message(pid, chat_command.help)
+                    end
+                end
+        )
+    end
+end
+
+menu.action(menu.my_root(), "Announce", {}, "", function()
+    announce_to_lobby()
+end)
+
+---
+--- Options Menu
+---
+
 local menu_options = menu.list(menu.my_root(), "Options")
 menu.toggle(menu_options, "Auto-Spectate Far Away Players", {}, "If enabled, you will automatically spectate players who issue commands from far away. Without this far away players will get an error when issuing commands.", function(toggle)
     config.auto_spectate_far_away_players = toggle
 end, config.auto_spectate_far_away_players)
+menu.slider(menu_options, "Num Spawns Allowed Per Player", {}, "The maximum number of vehicle spawns allowed per player. Once this number is reached, additional spawns will delete the oldest spawned vehicle.", 0, 5, config.num_allowed_spawned_vehicles_per_player, 1, function(value)
+    config.num_allowed_spawned_vehicles_per_player = value
+end)
+menu.list_select(menu_options, "AFK Lobby Type", {}, "When in AFK mode and alone in a lobby, what type of lobby should you switch to.", lobby_modes, config.lobby_mode_index, function(index)
+    config.lobby_mode_index = index
+end)
+menu.toggle(menu_options, "AFK in Casino", {}, "Keep roulette rigged for others while AFK.", function(toggle)
+    config.afk_mode_in_casino = toggle
+end, config.afk_mode_in_casino)
 
 ---
 --- Script Meta Menu
@@ -1818,7 +1977,4 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 --- Run
 ---
 
-util.create_tick_handler(function()
-    return true
-end)
-
+util.create_tick_handler(afk_mode_tick)
