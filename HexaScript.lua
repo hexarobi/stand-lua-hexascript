@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b2"
+local SCRIPT_VERSION = "0.13b3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -167,6 +167,8 @@ local VEHICLE_MODEL_SHORTCUTS = {
     s80rr = "s80",
     re7b = "le7b",
     x80 = "prototipo",
+    rattruck = "ratloader2",
+    liberator = "monster",
     -- Thanks EndGame for additional aliases!
     d10 = "coquette4",
     xxr = "entity2",
@@ -189,6 +191,37 @@ local VEHICLE_MODEL_SHORTCUTS = {
     tb = "terbyte",
     lf22 = "starling",
     fh1 = "hunter",
+    gtb = "italigtb",
+    gtb2 = "italigtb2",
+    xo = "torero2",
+    dv8 = "deveste",
+    roosevelt = "btype",
+    frankenstange = "btype2",
+    stange = "btype2",
+    valor = "btype3",
+    vette = "coquette2",
+    stirling = "feltzer3",
+    bond = "jb700",
+    bond2 = "jb7002",
+    bennyspeyote = "peyote3",
+    bennystornado = "tornado5",
+    gogo = "blista3",
+    bennyscomet = "comet3",
+    bennysspecter = "specter2",
+    bennysbanshee = "banshee2",
+    bennysmanana = "manana2",
+    bennysgtb = "italigtb2",
+    bennysnero = "nero2",
+    bennysdonk = "faction3",
+    donk = "faction3",
+    bennysminivan = "minivan2",
+    bennyssabre = "sabregt2",
+    bennysvirgo = "virgo2",
+    bennysbuccaneer = "buccaneer2",
+    bennyschino = "chino2",
+    bennysfaction = "faction2",
+    bennysvoodoo = "voodoo",
+    bennysgauntlet = "gauntlet5",
 }
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
@@ -616,10 +649,6 @@ local function set_vehicle_paint(pid, vehicle, commands)
     if commands and commands[2] then
         for i, command in ipairs(commands) do
             if not main_color then
-                --local standard_color = get_vehicle_color_from_command(command)
-                --if standard_color then
-                --
-                --end
                 local command_color = get_command_color(command)
                 if command_color then
                     main_color = command_color
@@ -970,7 +999,10 @@ add_chat_command{
         "For a money boost try CEO pay (30k per min) use !vip for Org invite, then !ceopay",
         "For even bigger boost watch for the casino to be rigged, more info: !help roulette",
         "You can sell !deathbike2 for 1mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
-    }
+    },
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
+    end
 }
 
 add_chat_command{
@@ -1178,6 +1210,27 @@ add_chat_command{
         end
     end
 }
+
+--add_chat_command{
+--    command="clearcustompaint",
+--    help={
+--        "Sets your vehicle paint. Allows for color names and paint type options",
+--        "Paint types: NORMAL, METALLIC, PEARL, MATTE, METAL, CHROME",
+--        "Example: !paint blue, !paint red and black, !paint metallic green",
+--        "Hex RGB color codes are allowed. Example: !paint #ff0000"
+--    },
+--    func=function(pid, commands)
+--        local vehicle = get_player_vehicle_in_control(pid)
+--        if vehicle then
+--            VEHICLE.CLEAR_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle)
+--            VEHICLE.CLEAR_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle)
+--            --VEHICLE.SET_VEHICLE_COLOURS(vehicle, 151, 151)
+--            VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 151)
+--            VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 151)
+--            help_message(pid, "Custom paint cleared")
+--        end
+--    end
+--}
 
 add_chat_command{
     command="paint2",
@@ -1690,6 +1743,16 @@ add_chat_command{
         local enabled_string = get_on_off_string((commands and commands[2]) or "on")
         menu.trigger_commands("autoheal " .. players.get_name(pid) .. " " .. enabled_string)
         help_message(pid, "Autoheal " .. enabled_string)
+    end
+}
+
+add_chat_command{
+    command="otr",
+    help="Go off the radar to hide from other players",
+    func=function(pid, commands)
+        local enabled_string = get_on_off_string((commands and commands[2]) or "on")
+        menu.trigger_commands("giveotr " .. players.get_name(pid) .. " " .. enabled_string)
+        help_message(pid, "Off the radar: " .. enabled_string)
     end
 }
 
