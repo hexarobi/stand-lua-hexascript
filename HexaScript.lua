@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b3"
+local SCRIPT_VERSION = "0.13b4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -59,6 +59,7 @@ local auto_update_config = {
             name="colors",
             source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/colors.lua",
             script_relpath="lib/hexascript/colors.lua",
+            switch_to_branch=selected_branch,
             is_required=true,
         },
         {
@@ -249,6 +250,11 @@ local passthrough_commands = {
 --        requires_player_name=true,
 --    },
     {
+        command="tele",
+        outbound_command="tele",
+        requires_player_name=true,
+    },
+    {
         command="casinotp",
         outbound_command="casinotp",
         requires_player_name=true,
@@ -328,8 +334,10 @@ end
 --- Casino AFK Mode
 ---
 
-local function is_player_within_dimensions(dimensions)
-    local player_pos = ENTITY.GET_ENTITY_COORDS(players.user_ped())
+local function is_player_within_dimensions(dimensions, pid)
+    if pid == nil then pid = players.user_ped() end
+    local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
+    local player_pos = ENTITY.GET_ENTITY_COORDS(target_ped)
     return (
             player_pos.x > dimensions.min.x and player_pos.x < dimensions.max.x
                     and player_pos.y > dimensions.min.y and player_pos.y < dimensions.max.y
@@ -354,7 +362,7 @@ local function force_roulette_area()
     end
 end
 
-local function is_player_in_casino()
+local function is_player_in_casino(pid)
     return is_player_within_dimensions({
         min={
             x=1073.9967,
@@ -366,7 +374,7 @@ local function is_player_in_casino()
             y=284.88977,
             z=-42.28554,
         },
-    })
+    }, pid)
 end
 
 
@@ -637,8 +645,10 @@ end
 local function get_command_color(command)
     if string.starts(command, "#") then
         return colorsRGB.DEC(command:sub(2))
-    else
-        return colorsRGB[command]
+    elseif colorsRGB.StandardColor(command) then
+        return colorsRGB.StandardColor(command)
+    elseif colorsRGB.colors_rgb[command] ~= nil then
+        return colorsRGB.colors_rgb[command]
     end
 end
 
@@ -652,8 +662,8 @@ local function set_vehicle_paint(pid, vehicle, commands)
                 local command_color = get_command_color(command)
                 if command_color then
                     main_color = command_color
-                    if command_color[4] then
-                        paint_type = get_paint_type(command_color[4])
+                    if command_color.a then
+                        paint_type = get_paint_type(command_color.a)
                     end
                 end
             end
@@ -670,17 +680,33 @@ local function set_vehicle_paint(pid, vehicle, commands)
         end
     end
     if not main_color then
-        main_color = colorsRGB.RANDOM_COLOR()
+        main_color = colorsRGB.random_color()
     end
     if not secondary_color then
         secondary_color = main_color
     end
-    -- util.toast("Main color "..main_color[1]..","..main_color[2]..","..main_color[3])
-    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
-    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
-    -- util.toast("Secondary color "..secondary_color[1]..","..secondary_color[2]..","..secondary_color[3])
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
-    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
+    if main_color.index ~= nil then
+        help_message(pid, "Painting vehicle standard "..main_color.name)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, main_color.index, 0)
+        VEHICLE.SET_VEHICLE_COLOURS(
+                vehicle,
+                main_color.index,
+                main_color.index
+        )
+        VEHICLE.CLEAR_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle)
+        VEHICLE.CLEAR_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle)
+    elseif main_color.r ~= nil then
+        help_message(pid, "Painting vehicle custom color")
+        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color.r, main_color.g, main_color.b)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
+    end
+    if secondary_color.index ~= nil then
+        VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, main_color.index, 0)
+        VEHICLE.CLEAR_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle)
+    elseif secondary_color.r ~= nil then
+        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color.r, secondary_color.g, secondary_color.b)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
+    end
     VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
 end
 
@@ -706,9 +732,9 @@ local function set_vehicle_secondary_paint(pid, vehicle, commands)
         end
     end
     if not secondary_color then
-        secondary_color = colorsRGB.RANDOM_COLOR()
+        secondary_color = colorsRGB.random_color()
     end
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
+    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color.r, secondary_color.g, secondary_color.b)
     VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
 end
 
@@ -717,10 +743,10 @@ local function shuffle_paint(vehicle)
     if VEHICLE.GET_VEHICLE_CLASS(vehicle) == constants.VEHICLE_CLASSES.EMERGENCY then
         return
     end
-    local main_color = colorsRGB.RANDOM_COLOR()
-    if main_color[1] then
-        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
-        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
+    local main_color = colorsRGB.random_color()
+    if main_color.r then
+        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color.r, main_color.g, main_color.b)
+        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, main_color.r, main_color.g, main_color.b)
     end
 end
 
