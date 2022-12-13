@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b4"
+local SCRIPT_VERSION = "0.13b5"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -348,16 +348,16 @@ end
 local function force_roulette_area()
     if not is_player_within_dimensions({
         min={
-            x=1135,
-            y=250,
-            z=-52,
+            x=1130,
+            y=240,
+            z=-55,
         },
         max={
-            x=1142,
-            y=260,
-            z=-50,
+            x=1150,
+            y=270,
+            z=-45,
         },
-    }) then
+    }, players.user()) then
         ENTITY.SET_ENTITY_COORDS(players.user_ped(), 1138.828, 256.55817, -51.035732)
     end
 end
@@ -1945,7 +1945,7 @@ local next_tick_time = util.current_time_millis() + config.tick_handler_delay
 
 local function afk_casino_tick()
     if not config.afk_mode_in_casino then return end
-    if not is_player_in_casino() then
+    if not is_player_in_casino(players.user()) then
         enter_casino()
     else
         force_roulette_area()
@@ -1961,7 +1961,7 @@ reset_announcement_timer()
 
 local function announce_to_lobby()
     announce_message("Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help")
-    if config.afk_mode_in_casino and is_player_in_casino() then
+    if config.afk_mode_in_casino and is_player_in_casino(players.user()) then
         announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !help roulette")
     end
     reset_announcement_timer()
