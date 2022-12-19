@@ -50,17 +50,23 @@ local auto_update_config = {
     dependencies={
         {
             name="constants",
-            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/constants.lua",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/constants.lua",
             script_relpath="lib/hexascript/constants.lua",
             is_required=true,
             verify_file_begins_with="--",
         },
         {
             name="colors",
-            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/colors.lua",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/colors.lua",
             script_relpath="lib/hexascript/colors.lua",
             switch_to_branch=selected_branch,
             is_required=true,
+        },
+        {
+            name="vehicles_list",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/vehicles.txt",
+            script_relpath="lib/hexascript/vehicles.txt",
+            switch_to_branch=selected_branch,
         },
         {
             name="natives-1651208000",
