@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b8"
+local SCRIPT_VERSION = "0.13b9"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1030,7 +1030,7 @@ add_chat_command{
 add_chat_command{
     command="vehicle",
     help={
-        "VEHICLE commands: !spawn, !invincible, !gift, !paint, !mods, !wheels, !shuffle, !tune",
+        "VEHICLE commands: !spawn, !gift, !paint, !mods, !wheels, !shuffle, !tune",
         "!headlights, !neonlights, !wheelcolor, !tires, !livery, !plate, !platetype, !horn, !repair",
     }
 }
@@ -1730,19 +1730,19 @@ add_chat_command{
     end
 }
 
-add_chat_command{
-    command="invincible",
-    help="Set vehicle to god mode and prevent all damage",
-    func=function(pid, commands)
-        local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle then
-            local enabled_string = get_on_off_string((commands and commands[2]) or "on")
-            local enabled = (enabled_string == "ON")
-            ENTITY.SET_ENTITY_INVINCIBLE(vehicle, enabled)
-            help_message(pid, "Vehicle invincibility " .. enabled_string)
-        end
-    end
-}
+--add_chat_command{
+--    command="invincible",
+--    help="Set vehicle to god mode and prevent all damage",
+--    func=function(pid, commands)
+--        local vehicle = get_player_vehicle_in_control(pid)
+--        if vehicle then
+--            local enabled_string = get_on_off_string((commands and commands[2]) or "on")
+--            local enabled = (enabled_string == "ON")
+--            ENTITY.SET_ENTITY_INVINCIBLE(vehicle, enabled)
+--            help_message(pid, "Vehicle invincibility " .. enabled_string)
+--        end
+--    end
+--}
 
 -- Self Commands
 
