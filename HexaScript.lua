@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b5"
+local SCRIPT_VERSION = "0.13b6"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -95,11 +95,14 @@ local colorsRGB = libs.colors
 --- Config
 ---
 
+local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&"}
+
 local config = {
     afk_mode = false,
     afk_mode_in_casino = true,
     chat_control_character = "!",
-    num_allowed_spawned_vehicles_per_player = 3,
+    chat_control_character_index = 1,
+    num_allowed_spawned_vehicles_per_player = 2,
     auto_spectate_far_away_players = true,
     lobby_mode_index = 1,
     tick_handler_delay = 60000,
@@ -223,6 +226,12 @@ local VEHICLE_MODEL_SHORTCUTS = {
     bennysfaction = "faction2",
     bennysvoodoo = "voodoo",
     bennysgauntlet = "gauntlet5",
+    mt = "entity3",
+    minirally = "issi8",
+    minisport = "issi7",
+    panther = "panthere",
+    ["300r"] = "r300",
+    m100 = "tulip2",
 }
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
@@ -917,7 +926,7 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
                 shuffle_wheels(vehicle)
                 shuffle_paint(vehicle)
                 shuffle_livery(vehicle)
-                --vehicle_set_nameplate(vehicle, players.get_name(pid))
+                vehicle_set_nameplate(vehicle, players.get_name(pid))
                 return false
             end
         end
@@ -1173,6 +1182,23 @@ add_chat_command{
         if vehicle then
             spawn_shuffled_vehicle_for_player(commands[2], pid)
         end
+    end
+}
+
+local vehicles_list = {}
+local file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
+if file then
+    for line in file:lines() do
+        table.insert(vehicles_list, line)
+    end
+end
+
+add_chat_command{
+    command="car",
+    help="Spawn a random vehicle",
+    func=function(pid, commands)
+        local model_name = vehicles_list[math.random(#vehicles_list)]
+        spawn_shuffled_vehicle_for_player(model_name, pid)
     end
 }
 
@@ -1904,7 +1930,8 @@ end
 
 -- Handler for all chat commands
 chat.on_message(function(pid, reserved, message_text, is_team_chat)
-    if string.starts(message_text, config.chat_control_character) then
+    local chat_control_character = control_characters[config.chat_control_character_index]
+    if string.starts(message_text, chat_control_character) then
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
             if commands[1] == chat_command.command:lower() and chat_command.func then
@@ -2028,6 +2055,9 @@ end)
 ---
 
 local menu_options = menu.list(menu.my_root(), "Options")
+menu.list_select(menu_options, "Chat Control Character", {}, "Set the character that chat commands must begin with", control_characters, config.chat_control_character_index, function(index)
+    config.chat_control_character_index = index
+end)
 menu.toggle(menu_options, "Auto-Spectate Far Away Players", {}, "If enabled, you will automatically spectate players who issue commands from far away. Without this far away players will get an error when issuing commands.", function(toggle)
     config.auto_spectate_far_away_players = toggle
 end, config.auto_spectate_far_away_players)
