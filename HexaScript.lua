@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b7"
+local SCRIPT_VERSION = "0.13b8"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1156,7 +1156,7 @@ add_chat_command{
     func=function(pid, commands)
         -- Thanks to Totaw Annihiwation for this script event!
         util.trigger_script_event(1 << pid, {
-            -1129846248,
+            -1643482755,
             players.user(),
             4,
             10000, -- wage?
@@ -1164,8 +1164,8 @@ add_chat_command{
             0,
             0,
             0,
-            memory.read_int(memory.script_global(1920255 + 9)), -- f_8
-            memory.read_int(memory.script_global(1920255 + 10)), -- f_9
+            memory.read_int(memory.script_global(1923597 + 9)), -- f_8
+            memory.read_int(memory.script_global(1923597 + 10)), -- f_9
         })
         help_message(pid, "Org invite sent. Please check your phone to accept invite.")
     end
@@ -1835,7 +1835,7 @@ add_chat_command{
 }
 
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C"}) do
+    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivia", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
         if players.get_name(pid) == player_name then
             return true
         end
