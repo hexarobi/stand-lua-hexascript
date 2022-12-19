@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b6"
+local SCRIPT_VERSION = "0.13b7"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -87,10 +87,12 @@ local auto_update_config = {
 auto_updater.run_auto_update(auto_update_config)
 local libs = {}
 for _, dependency in pairs(auto_update_config.dependencies) do
-    if dependency.loaded_lib == nil then
-        util.toast("Error loading lib "..dependency.name, TOAST_ALL)
+    if dependency.is_required then
+        if dependency.loaded_lib == nil then
+            util.toast("Error loading lib "..dependency.name, TOAST_ALL)
+        end
+        libs[dependency.name] = dependency.loaded_lib
     end
-    libs[dependency.name] = dependency.loaded_lib
 end
 
 local constants = libs.constants
