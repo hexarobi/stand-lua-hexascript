@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b10"
+local SCRIPT_VERSION = "0.13b11"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -398,20 +398,25 @@ end
 --- Utils
 ---
 
+local function replace_command_character(message)
+    local chat_control_character = control_characters[config.chat_control_character_index]
+    return message:gsub(" !", " "..chat_control_character)
+end
+
 local function help_message(pid, message)
     if pid ~= nil and message ~= nil then
         if (type(message) == "table") then
             for _, message_part in pairs(message) do
-                chat.send_targeted_message(pid, pid, message_part, false)
+                chat.send_targeted_message(pid, pid, replace_command_character(message_part), false)
             end
         else
-            chat.send_targeted_message(pid, pid, message, false)
+            chat.send_targeted_message(pid, pid, replace_command_character(message), false)
         end
     end
 end
 
 local function announce_message(message)
-    chat.send_message(message, false, true, true)
+    chat.send_message(replace_command_character(message), false, true, true)
 end
 
 ---
