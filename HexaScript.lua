@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b9"
+local SCRIPT_VERSION = "0.13b10"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -116,6 +116,73 @@ local config = {
     tick_handler_delay = 60000,
     announce_delay = 60,
 }
+
+local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
+filesystem.mkdirs(CONFIG_DIR)
+local FRIENDS_LIST_FILE = CONFIG_DIR .. "friends_list.json"
+
+local function save_friends(friends_list)
+    local file = io.open(FRIENDS_LIST_FILE, "wb")
+    if file == nil then util.toast("Error opening friends list file for writing: "..FRIENDS_LIST_FILE, TOAST_ALL) return end
+    file:write(soup.json.encode(friends_list))
+    file:close()
+end
+
+local function load_friends()
+    local file = io.open(FRIENDS_LIST_FILE)
+    if file then
+        local version = file:read()
+        file:close()
+        local load_friends_status, friends_list = pcall(soup.json.decode, version)
+        if not load_friends_status then
+            error("Could not decode friends list file")
+        end
+        return friends_list
+    else
+        return {}
+    end
+end
+
+local function add_friend(pid)
+    local new_friend = {
+        pid=pid,
+        name=players.get_name(pid),
+        rockstar_id=players.get_rockstar_id(pid),
+        rockstar_id_2=players.get_rockstar_id_2(pid),
+        added_at=util.current_time_millis(),
+    }
+    local friends_list = load_friends()
+    for _, friend in pairs(friends_list) do
+        if friend.rockstar_id == new_friend.rockstar_id then
+            return true
+        end
+    end
+    table.insert(friends_list, new_friend)
+    save_friends(friends_list)
+    return true
+end
+
+local function is_friend_in_lobby(current_lobby_rockstar_ids, friend)
+    for _, rockstar_id in current_lobby_rockstar_ids do
+        if friend.rockstar_id == rockstar_id then
+            return true
+        end
+    end
+    return false
+end
+
+local function invite_friends_to_lobby()
+    local current_lobby_rockstar_ids = {}
+    for _, player_id in pairs(players.list()) do
+        table.insert(current_lobby_rockstar_ids, players.get_rockstar_id(player_id))
+    end
+    local friends_list = load_friends()
+    for _, friend in pairs(friends_list) do
+        if not is_friend_in_lobby(current_lobby_rockstar_ids, friend) then
+            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+        end
+    end
+end
 
 local lobby_modes = {
     { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
@@ -276,12 +343,12 @@ local passthrough_commands = {
         outbound_command="casinotp",
         requires_player_name=true,
     },
-    {
-        command="animal",
-        help="Turns into a random animal",
-        outbound_command="furry",
-        requires_player_name=true,
-    },
+    --{
+    --    command="animal",
+    --    help="Turns into a random animal",
+    --    outbound_command="furry",
+    --    requires_player_name=true,
+    --},
 }
 
 ---
@@ -1023,7 +1090,7 @@ add_chat_command{
 add_chat_command{
     command="self",
     help={
-        "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal, !tpme, !vip, !unstick, !noclip, !cleanup",
+        "SELF commands: !autoheal, !bail, !allguns, !ammo, !tpme, !vip, !unstick, !noclip, !cleanup",
     }
 }
 
@@ -1154,7 +1221,7 @@ add_chat_command{
     command="vip",
     help="Request an org invite, useful for ceopay or VIP at casino.",
     func=function(pid, commands)
-        -- Thanks to Totaw Annihiwation for this script event!
+        -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
             -1643482755,
             players.user(),
@@ -1834,6 +1901,17 @@ add_chat_command{
     end
 }
 
+add_chat_command{
+    command="friend",
+    help="Add to friend list for future lobby invites",
+    func=function(pid, commands)
+        if add_friend(pid) then
+            help_message(pid, "You have been added to the friends list and will get lobby invites when available.")
+        end
+    end
+}
+
+
 local function is_player_special(pid)
     for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivia", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
         if players.get_name(pid) == player_name then
@@ -1972,6 +2050,10 @@ local function enter_casino()
     menu.trigger_commands("casinotp " .. players.get_name(players.user()))
 end
 
+local function force_org()
+    menu.trigger_commands("ceostart")
+end
+
 ---
 --- Update Tick
 ---
@@ -1984,6 +2066,7 @@ local function afk_casino_tick()
         enter_casino()
     else
         force_roulette_area()
+        --force_org()
     end
 end
 
@@ -1997,7 +2080,7 @@ reset_announcement_timer()
 local function announce_to_lobby()
     announce_message("Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help")
     if config.afk_mode_in_casino and is_player_in_casino(players.user()) then
-        announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !help roulette")
+        announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !roulette")
     end
     reset_announcement_timer()
 end
@@ -2057,6 +2140,24 @@ end
 menu.action(menu.my_root(), "Announce", {}, "", function()
     announce_to_lobby()
 end)
+
+local friends_menus = {}
+local friends_menu
+friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
+    for _, friend_menu in pairs(friends_menus) do
+        if friend_menu:isValid() then
+            menu.delete(friend_menu)
+        end
+    end
+    for _, friend in pairs(load_friends()) do
+        local friend_menu = menu.list(friends_menu, friend.name)
+        menu.action(friend_menu, "Invite", {}, "", function()
+            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+        end)
+        table.insert(friends_menus, friend_menu)
+    end
+end)
+
 
 ---
 --- Options Menu
