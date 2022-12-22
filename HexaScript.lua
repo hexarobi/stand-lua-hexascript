@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b11"
+local SCRIPT_VERSION = "0.13b12"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -86,10 +86,17 @@ local auto_update_config = {
 }
 auto_updater.run_auto_update(auto_update_config)
 local libs = {}
+local loaded_lib_status, loaded_lib
 for _, dependency in pairs(auto_update_config.dependencies) do
     if dependency.is_required then
         if dependency.loaded_lib == nil then
-            util.toast("Error loading lib "..dependency.name, TOAST_ALL)
+            local lib_require_path = dependency.script_relpath:gsub("[.]lua$", "")
+            loaded_lib_status, loaded_lib = pcall(require, lib_require_path)
+            if not loaded_lib_status then
+                error("Could not load required dependency `"..dependency.name.."`")
+            else
+                dependency.loaded_lib = loaded_lib
+            end
         end
         libs[dependency.name] = dependency.loaded_lib
     end
@@ -542,6 +549,8 @@ local function spawn_vehicle_for_player(model_name, pid, offset)
 end
 
 local function vehicle_set_mod_max_value(vehicle, vehicle_mod)
+    -- Dont apply max mods to entity3 to avoid crashes
+    if util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle)) == "entity3" then return -1 end
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
     if vehicle_mod == 34 then max = -1 end  -- Don't set shifters to avoid crash
     VEHICLE.SET_VEHICLE_MOD(vehicle, vehicle_mod, max)
@@ -1006,7 +1015,7 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
                 shuffle_wheels(vehicle)
                 shuffle_paint(vehicle)
                 shuffle_livery(vehicle)
-                vehicle_set_nameplate(vehicle, players.get_name(pid))
+                --vehicle_set_nameplate(vehicle, players.get_name(pid))
                 return false
             end
         end
@@ -1291,27 +1300,27 @@ local function request_control_once(entity)
     return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
 end
 
-add_chat_command{
-    command="fly",
-    help="Fly a plane",
-    func=function(pid, commands)
-        local vehicle_model_name = "lazer"
-        if commands[2] ~= nil then
-            vehicle_model_name = commands[2]
-        end
-        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
-        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
-            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid, {x=0, y=4, z=30})
-            if vehicle then
-                vehicle_mods_set_max_performance(vehicle)
-                shuffle_vehicle(vehicle)
-                request_control_once(vehicle)
-                PED.SET_PED_INTO_VEHICLE(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), vehicle, -1)
-                VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 100)
-            end
-        end
-    end
-}
+--add_chat_command{
+--    command="fly",
+--    help="Fly a plane",
+--    func=function(pid, commands)
+--        local vehicle_model_name = "lazer"
+--        if commands[2] ~= nil then
+--            vehicle_model_name = commands[2]
+--        end
+--        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
+--        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
+--            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid, {x=0, y=4, z=30})
+--            if vehicle then
+--                vehicle_mods_set_max_performance(vehicle)
+--                shuffle_vehicle(vehicle)
+--                request_control_once(vehicle)
+--                PED.SET_PED_INTO_VEHICLE(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), vehicle, -1)
+--                VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 100)
+--            end
+--        end
+--    end
+--}
 
 add_chat_command{
     command="shuffle",
@@ -1931,7 +1940,7 @@ add_chat_command{
     func=function(pid, commands)
         if is_player_special(pid) then
             help_message(pid, "Special access granted. Attempting to kick "..commands[2])
-            menu.trigger_commands("breakup" .. commands[2])
+            menu.trigger_commands("breakup " .. commands[2])
         end
     end
 }
@@ -2056,7 +2065,12 @@ local function enter_casino()
 end
 
 local function force_org()
-    menu.trigger_commands("ceostart")
+    local org_type = players.get_org_type(players.user())
+    if org_type == -1 then
+        menu.trigger_commands("mcstart")
+    elseif org_type == 0 then
+        menu.trigger_commands("ceotomc")
+    end
 end
 
 ---
@@ -2071,7 +2085,6 @@ local function afk_casino_tick()
         enter_casino()
     else
         force_roulette_area()
-        --force_org()
     end
 end
 
@@ -2101,6 +2114,7 @@ local function afk_mode_tick()
     if config.afk_mode then
         if util.current_time_millis() > next_tick_time then
             next_tick_time = util.current_time_millis() + config.tick_handler_delay
+            force_org()
             if is_lobby_empty() then
                 find_new_lobby()
             else
@@ -2160,6 +2174,14 @@ friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
             menu.trigger_commands("ridinvite "..friend.rockstar_id)
         end)
         table.insert(friends_menus, friend_menu)
+    end
+end)
+
+menu.action(menu.my_root(), "Bulk Invite", {}, "", function()
+    for _, friend in pairs(load_friends()) do
+        util.toast("Inviting "..friend.name)
+        menu.trigger_commands("ridinvite "..friend.rockstar_id)
+        util.yield(5000)
     end
 end)
 
