@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.12"
+local SCRIPT_VERSION = "0.13"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -50,48 +50,174 @@ local auto_update_config = {
     dependencies={
         {
             name="constants",
-            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/constants.lua",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/constants.lua",
             script_relpath="lib/hexascript/constants.lua",
             is_required=true,
             verify_file_begins_with="--",
         },
         {
             name="colors",
-            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/colors.lua",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/colors.lua",
             script_relpath="lib/hexascript/colors.lua",
+            switch_to_branch=selected_branch,
             is_required=true,
         },
+        {
+            name="vehicles_list",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/vehicles.txt",
+            script_relpath="lib/hexascript/vehicles.txt",
+            switch_to_branch=selected_branch,
+        },
+        {
+            name="natives-1651208000",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/natives-1651208000.lua",
+            script_relpath="lib/natives-1651208000.lua",
+            verify_file_begins_with="--",
+            is_required=true,
+        },
+        --{
+        --    name="inspect",
+        --    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
+        --    script_relpath="lib/inspect.lua",
+        --    verify_file_begins_with="local",
+        --    is_required=true,
+        --},
     }
 }
 auto_updater.run_auto_update(auto_update_config)
 local libs = {}
+local loaded_lib_status, loaded_lib
 for _, dependency in pairs(auto_update_config.dependencies) do
-    if dependency.loaded_lib == nil then
-        util.toast("Error loading lib "..dependency.name, TOAST_ALL)
+    if dependency.is_required then
+        if dependency.loaded_lib == nil then
+            local lib_require_path = dependency.script_relpath:gsub("[.]lua$", "")
+            loaded_lib_status, loaded_lib = pcall(require, lib_require_path)
+            if not loaded_lib_status then
+                error("Could not load required dependency `"..dependency.name.."`")
+            else
+                dependency.loaded_lib = loaded_lib
+            end
+        end
+        libs[dependency.name] = dependency.loaded_lib
     end
-    libs[dependency.name] = dependency.loaded_lib
 end
 
 local constants = libs.constants
 local colorsRGB = libs.colors
+--local inspect = libs.inspect
 
----
---- Dependencies
----
-
-util.require_natives(1651208000)
+local vehicles_list = {}
+local file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
+if file then
+    for line in file:lines() do
+        table.insert(vehicles_list, line)
+    end
+end
 
 ---
 --- Config
 ---
 
+local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&"}
+
 local config = {
+    afk_mode = false,
+    afk_mode_in_casino = true,
     chat_control_character = "!",
-    num_allowed_spawned_vehicles_per_player = 3,
+    chat_control_character_index = 1,
+    num_allowed_spawned_vehicles_per_player = 2,
     auto_spectate_far_away_players = true,
+    lobby_mode_index = 2,
+    tick_handler_delay = 60000,
+    announce_delay = 60,
 }
 
-local CHAT_CONTROL_CHARACTER = "!"
+local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
+filesystem.mkdirs(CONFIG_DIR)
+local FRIENDS_LIST_FILE = CONFIG_DIR .. "friends_list.json"
+
+local function save_friends(friends_list)
+    local file = io.open(FRIENDS_LIST_FILE, "wb")
+    if file == nil then util.toast("Error opening friends list file for writing: "..FRIENDS_LIST_FILE, TOAST_ALL) return end
+    file:write(soup.json.encode(friends_list))
+    file:close()
+end
+
+local function load_friends()
+    local file = io.open(FRIENDS_LIST_FILE)
+    if file then
+        local version = file:read()
+        file:close()
+        local load_friends_status, friends_list = pcall(soup.json.decode, version)
+        if not load_friends_status then
+            error("Could not decode friends list file")
+        end
+        return friends_list
+    else
+        return {}
+    end
+end
+
+local function add_friend(pid)
+    local new_friend = {
+        pid=pid,
+        name=players.get_name(pid),
+        rockstar_id=players.get_rockstar_id(pid),
+        rockstar_id_2=players.get_rockstar_id_2(pid),
+        added_at=util.current_time_millis(),
+    }
+    local friends_list = load_friends()
+    for _, friend in pairs(friends_list) do
+        if friend.rockstar_id == new_friend.rockstar_id then
+            return true
+        end
+    end
+    table.insert(friends_list, new_friend)
+    save_friends(friends_list)
+    return true
+end
+
+local function remove_friend(pid)
+    local rockstar_id = players.get_rockstar_id(pid)
+    local friends_list = load_friends()
+    for index, friend in pairs(friends_list) do
+        if friend.rockstar_id == rockstar_id then
+            friends_list[index] = nil
+            save_friends(friends_list)
+            return true
+        end
+    end
+    return false
+end
+
+local function is_friend_in_lobby(current_lobby_rockstar_ids, friend)
+    for _, rockstar_id in current_lobby_rockstar_ids do
+        if friend.rockstar_id == rockstar_id then
+            return true
+        end
+    end
+    return false
+end
+
+local function invite_friends_to_lobby()
+    local current_lobby_rockstar_ids = {}
+    for _, player_id in pairs(players.list()) do
+        table.insert(current_lobby_rockstar_ids, players.get_rockstar_id(player_id))
+    end
+    local friends_list = load_friends()
+    for _, friend in pairs(friends_list) do
+        if not is_friend_in_lobby(current_lobby_rockstar_ids, friend) then
+            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+        end
+    end
+end
+
+local lobby_modes = {
+    { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
+    { "New", {}, "Create a new empty public session.", "gosolopub" },
+    { "Join Friend", {}, "Join a friends session.", "go joinafriend" },
+    { "Friends Only", {}, "Create a new closed friends only session.", "go closedfriend" },
+}
 
 local VEHICLE_MODEL_SHORTCUTS = {
     moc = "trailerlarge",
@@ -148,6 +274,8 @@ local VEHICLE_MODEL_SHORTCUTS = {
     s80rr = "s80",
     re7b = "le7b",
     x80 = "prototipo",
+    rattruck = "ratloader2",
+    liberator = "monster",
     -- Thanks EndGame for additional aliases!
     d10 = "coquette4",
     xxr = "entity2",
@@ -170,6 +298,44 @@ local VEHICLE_MODEL_SHORTCUTS = {
     tb = "terbyte",
     lf22 = "starling",
     fh1 = "hunter",
+    gtb = "italigtb",
+    gtb2 = "italigtb2",
+    xo = "torero2",
+    dv8 = "deveste",
+    roosevelt = "btype",
+    frankenstange = "btype2",
+    stange = "btype2",
+    valor = "btype3",
+    vette = "coquette2",
+    stirling = "feltzer3",
+    bond = "jb700",
+    bond2 = "jb7002",
+    bennyspeyote = "peyote3",
+    bennystornado = "tornado5",
+    gogo = "blista3",
+    bennyscomet = "comet3",
+    bennysspecter = "specter2",
+    bennysbanshee = "banshee2",
+    bennysmanana = "manana2",
+    bennysgtb = "italigtb2",
+    bennysnero = "nero2",
+    bennysdonk = "faction3",
+    donk = "faction3",
+    bennysminivan = "minivan2",
+    bennyssabre = "sabregt2",
+    bennysvirgo = "virgo2",
+    bennysbuccaneer = "buccaneer2",
+    bennyschino = "chino2",
+    bennysfaction = "faction2",
+    bennysvoodoo = "voodoo",
+    bennysgauntlet = "gauntlet5",
+    mt = "entity3",
+    entitymt = "entity3",
+    minirally = "issi8",
+    minisport = "issi7",
+    panther = "panthere",
+    ["300r"] = "r300",
+    m100 = "tulip2",
 }
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
@@ -197,45 +363,29 @@ local passthrough_commands = {
 --        requires_player_name=true,
 --    },
     {
+        command="tele",
+        outbound_command="tele",
+        requires_player_name=true,
+    },
+    {
         command="casinotp",
         outbound_command="casinotp",
         requires_player_name=true,
     },
-    {
-        command="animal",
-        help="Turns into a random animal",
-        outbound_command="furry",
-        requires_player_name=true,
-    },
     --{
-    --    command="sprunk",
-    --    help="Spawns a sprunkified vehicle and some cans",
-    --    player_command="sprunk",
-    --},
-    --{
-    --    command="sprunkify",
-    --    help="Sprunkify your vehicle!",
-    --}
-    --{
-    --    command="gift",
-    --    help={
-    --        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
-    --        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
-    --        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
-    --        "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
-    --        "#5 To enable your currently driven vehicle to be parked in a garage say !gift",
-    --        "#6 Drive your vehicle into your garage and when prompted, choose YES to replace a free car with your spawned car",
-    --        "#7 If successful the spawned car should now be listed as deliverable when you call your Mechanic"
-    --    },
+    --    command="animal",
+    --    help="Turns into a random animal",
+    --    outbound_command="furry",
     --    requires_player_name=true,
-    --    help_message="Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!",
     --},
 }
 
+---
+--- Constructor Spawnable Constructs Passthrough Commands
+---
 
 local CONSTRUCTS_DIR = filesystem.stand_dir() .. 'Constructs\\'
 local SPAWNABLE_DIR = CONSTRUCTS_DIR.."/spawnable"
-
 
 local function load_spawnable_names_from_dir(directory)
     local spawnable_names = {}
@@ -261,7 +411,6 @@ local function load_all_spawnable_names_from_dir(directory)
 end
 
 local spawnable_names = load_all_spawnable_names_from_dir(SPAWNABLE_DIR)
-
 for _, spawnable_name in pairs(spawnable_names) do
     table.insert(
         passthrough_commands,
@@ -278,28 +427,85 @@ end
 --- Utils
 ---
 
+local function replace_command_character(message)
+    local chat_control_character = control_characters[config.chat_control_character_index]
+    return message:gsub(" !", " "..chat_control_character)
+end
+
 local function help_message(pid, message)
     if pid ~= nil and message ~= nil then
         if (type(message) == "table") then
             for _, message_part in pairs(message) do
-                chat.send_targeted_message(pid, pid, message_part, false)
+                chat.send_targeted_message(pid, pid, replace_command_character(message_part), false)
             end
         else
-            chat.send_targeted_message(pid, pid, message, false)
+            chat.send_targeted_message(pid, pid, replace_command_character(message), false)
         end
     end
 end
 
-local function is_player_in_casino(pid)
-    local player_pos = players.get_position(pid)
-    -- Casino pos 1100.000, 220.000, -50.000
-    if player_pos.x > 900 and player_pos.x < 1300
-        and player_pos.y > 0 and player_pos.y < 500
-        and player_pos.z > -100 and player_pos.z < 0 then
-        return true
-    end
-    return false
+local function announce_message(message)
+    chat.send_message(replace_command_character(message), false, true, true)
 end
+
+---
+--- Casino AFK Mode
+---
+
+local function is_player_within_dimensions(dimensions, pid)
+    if pid == nil then pid = players.user_ped() end
+    local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
+    local player_pos = ENTITY.GET_ENTITY_COORDS(target_ped)
+    return (
+            player_pos.x > dimensions.min.x and player_pos.x < dimensions.max.x
+                    and player_pos.y > dimensions.min.y and player_pos.y < dimensions.max.y
+                    and player_pos.z > dimensions.min.z and player_pos.z < dimensions.max.z
+    )
+end
+
+local function force_roulette_area()
+    if not is_player_within_dimensions({
+        min={
+            x=1130,
+            y=240,
+            z=-55,
+        },
+        max={
+            x=1150,
+            y=270,
+            z=-45,
+        },
+    }, players.user()) then
+        ENTITY.SET_ENTITY_COORDS(players.user_ped(), 1138.828, 256.55817, -51.035732)
+    end
+end
+
+local function is_player_in_casino(pid)
+    return is_player_within_dimensions({
+        min={
+            x=1073.9967,
+            y=189.58717,
+            z=-53.838943,
+        },
+        max={
+            x=1166.935,
+            y=284.88977,
+            z=-42.28554,
+        },
+    }, pid)
+end
+
+
+--local function is_player_in_casino(pid)
+--    local player_pos = players.get_position(pid)
+--    -- Casino pos 1100.000, 220.000, -50.000
+--    if player_pos.x > 900 and player_pos.x < 1300
+--        and player_pos.y > 0 and player_pos.y < 500
+--        and player_pos.z > -100 and player_pos.z < 0 then
+--        return true
+--    end
+--    return false
+--end
 
 local function is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name)
     local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
@@ -365,6 +571,8 @@ local function spawn_vehicle_for_player(model_name, pid, offset)
 end
 
 local function vehicle_set_mod_max_value(vehicle, vehicle_mod)
+    -- Dont apply max mods to entity3 to avoid crashes
+    if util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle)) == "entity3" then return -1 end
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
     if vehicle_mod == 34 then max = -1 end  -- Don't set shifters to avoid crash
     VEHICLE.SET_VEHICLE_MOD(vehicle, vehicle_mod, max)
@@ -417,15 +625,14 @@ local function get_player_vehicle_handles()
 end
 
 local function is_entity_occupied(entity, type, player_vehicle_handles)
-    local occupied = false
     if type == "VEHICLE" then
         for _, vehicle_handle in pairs(player_vehicle_handles) do
             if entity == vehicle_handle then
-                occupied = true
+                return true
             end
         end
     end
-    return occupied
+    return false
 end
 
 local function delete_entities_by_range(my_entities, range, type, pid)
@@ -558,8 +765,10 @@ end
 local function get_command_color(command)
     if string.starts(command, "#") then
         return colorsRGB.DEC(command:sub(2))
-    else
-        return colorsRGB[command]
+    elseif colorsRGB.StandardColor(command) then
+        return colorsRGB.StandardColor(command)
+    elseif colorsRGB.colors_rgb[command] ~= nil then
+        return colorsRGB.colors_rgb[command]
     end
 end
 
@@ -570,15 +779,11 @@ local function set_vehicle_paint(pid, vehicle, commands)
     if commands and commands[2] then
         for i, command in ipairs(commands) do
             if not main_color then
-                --local standard_color = get_vehicle_color_from_command(command)
-                --if standard_color then
-                --
-                --end
                 local command_color = get_command_color(command)
                 if command_color then
                     main_color = command_color
-                    if command_color[4] then
-                        paint_type = get_paint_type(command_color[4])
+                    if command_color.a then
+                        paint_type = get_paint_type(command_color.a)
                     end
                 end
             end
@@ -595,17 +800,33 @@ local function set_vehicle_paint(pid, vehicle, commands)
         end
     end
     if not main_color then
-        main_color = colorsRGB.RANDOM_COLOR()
+        main_color = colorsRGB.random_color()
     end
     if not secondary_color then
         secondary_color = main_color
     end
-    -- util.toast("Main color "..main_color[1]..","..main_color[2]..","..main_color[3])
-    VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
-    VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
-    -- util.toast("Secondary color "..secondary_color[1]..","..secondary_color[2]..","..secondary_color[3])
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
-    VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
+    if main_color.index ~= nil then
+        help_message(pid, "Painting vehicle standard "..main_color.name)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, main_color.index, 0)
+        VEHICLE.SET_VEHICLE_COLOURS(
+                vehicle,
+                main_color.index,
+                main_color.index
+        )
+        VEHICLE.CLEAR_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle)
+        VEHICLE.CLEAR_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle)
+    elseif main_color.r ~= nil then
+        help_message(pid, "Painting vehicle custom color")
+        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color.r, main_color.g, main_color.b)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, paint_type, 0, 0)
+    end
+    if secondary_color.index ~= nil then
+        VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, main_color.index, 0)
+        VEHICLE.CLEAR_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle)
+    elseif secondary_color.r ~= nil then
+        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color.r, secondary_color.g, secondary_color.b)
+        VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
+    end
     VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
 end
 
@@ -631,9 +852,9 @@ local function set_vehicle_secondary_paint(pid, vehicle, commands)
         end
     end
     if not secondary_color then
-        secondary_color = colorsRGB.RANDOM_COLOR()
+        secondary_color = colorsRGB.random_color()
     end
-    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color[1], secondary_color[2], secondary_color[3])
+    VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color.r, secondary_color.g, secondary_color.b)
     VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
 end
 
@@ -642,10 +863,10 @@ local function shuffle_paint(vehicle)
     if VEHICLE.GET_VEHICLE_CLASS(vehicle) == constants.VEHICLE_CLASSES.EMERGENCY then
         return
     end
-    local main_color = colorsRGB.RANDOM_COLOR()
-    if main_color[1] then
-        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
-        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, main_color[1], main_color[2], main_color[3])
+    local main_color = colorsRGB.random_color()
+    if main_color.r then
+        VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, main_color.r, main_color.g, main_color.b)
+        VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, main_color.r, main_color.g, main_color.b)
     end
 end
 
@@ -807,18 +1028,19 @@ local function strsplit(inputstr, sep)
 end
 
 local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
-    if vehicle_model_name then
-        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
-        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
-            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
-            if vehicle then
-                max_mods(vehicle)
-                shuffle_wheels(vehicle)
-                shuffle_paint(vehicle)
-                shuffle_livery(vehicle)
-                --vehicle_set_nameplate(vehicle, players.get_name(pid))
-                return false
-            end
+    if vehicle_model_name == nil or vehicle_model_name == "" then
+        vehicle_model_name = vehicles_list[math.random(#vehicles_list)]
+    end
+    vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
+    if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
+        local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
+        if vehicle then
+            max_mods(vehicle)
+            shuffle_wheels(vehicle)
+            shuffle_paint(vehicle)
+            shuffle_livery(vehicle)
+            --vehicle_set_nameplate(vehicle, players.get_name(pid))
+            return false
         end
     end
 end
@@ -865,9 +1087,6 @@ local function get_on_off_string(command)
     return (get_on_off(command) and "ON" or "OFF")
 end
 
-local chat_commands = {}
-local chat_commands_menu_list = menu.list(menu.my_root(), "Chat Commands")
-
 local function get_menu_action_help(chat_command_options)
     if chat_command_options.help == nil then
         return ""
@@ -878,51 +1097,49 @@ local function get_menu_action_help(chat_command_options)
     return chat_command_options.help
 end
 
-chat_commands.add = function(chat_command_options)
+local chat_commands = {}
+
+local function add_chat_command(chat_command_options)
     table.insert(chat_commands, chat_command_options)
-    menu.action(
-        chat_commands_menu_list, chat_command_options.command,
-        {chat_command_options.override_action_command or chat_command_options.command}, get_menu_action_help(chat_command_options),
-        function(click_type, pid)
-            return chat_command_options.func(pid)
-        end
-    )
 end
 
 -- Help Commands
 
-chat_commands.add{
+add_chat_command{
     command="help",
-    func=function(pid, commands)
-        for _, chat_command in ipairs(chat_commands) do
-            if commands[2] == chat_command.command then
-                help_message(pid, chat_command.help)
-                return
+    help={
+        "Welcome! Please don't grief others. For help with a specific command say !help <COMMAND>",
+        "Available command categories: SELF, VEHICLE, MONEY",
+    },
+    func=function(pid, commands, this_chat_command)
+        if type(commands) == "table" then
+            for _, chat_command in ipairs(chat_commands) do
+                if commands[2] == chat_command.command then
+                    help_message(pid, chat_command.help)
+                    return
+                end
             end
         end
-        help_message(pid, {
-            "Welcome! Please don't grief others. For help with a specific command say !help <COMMAND>",
-            "Available command categories: SELF, VEHICLE, MONEY",
-        })
+        help_message(pid, this_chat_command.help)
     end,
 }
 
-chat_commands.add{
+add_chat_command{
     command="self",
     help={
-        "SELF commands: !autoheal, !bail, !allguns, !ammo, !animal, !tpme, !vip, !unstick, !noclip, !cleanup",
+        "SELF commands: !autoheal, !bail, !allguns, !ammo, !tpme, !vip, !unstick, !noclip, !cleanup",
     }
 }
 
-chat_commands.add{
+add_chat_command{
     command="vehicle",
     help={
-        "VEHICLE commands: !spawn, !invincible, !gift, !paint, !mods, !wheels, !shuffle, !tune",
+        "VEHICLE commands: !spawn, !gift, !paint, !mods, !wheels, !shuffle, !tune",
         "!headlights, !neonlights, !wheelcolor, !tires, !livery, !plate, !platetype, !horn, !repair",
     }
 }
 
-chat_commands.add{
+add_chat_command{
     command="money",
     help={
         "The best way to make money is from running missions and heists! It's more fun and satisfying",
@@ -935,7 +1152,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="roulette",
     help={
         "HOW TO PLAY RIGGED ROULETTE: Enter the casino (!casinotp) get chips from cashier then enter the TABLE GAMES section.",
@@ -949,14 +1166,16 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift",
     help={
-       "Fill a garage with FREE cars from legendary motor. Use !gift and replace free cars with spawned cars. For details try !help gift1"
+       "First fill a garage with FREE cars from Legendary Motor. Use !gift, then drive into garage and REPLACE a free car. For step-by-step instructions use !help gift1"
     },
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle then
+        if vehicle == 0 then
+            help_message(pid, "You must be in a vehicle to use !gift")
+        else
             --delete_nearby_invis_vehicles(pid)
             local command_string = "gift " .. players.get_name(pid)
             menu.trigger_commands(command_string)
@@ -965,7 +1184,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift1",
     help={
         "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
@@ -978,7 +1197,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift2",
     help={
         "#4 Spawn the car you want to keep by saying !spawn carname (or just !carname) and get in drivers seat",
@@ -991,7 +1210,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="gift3",
     help={
         "Make sure to purchase insurance at LS Customs for each spawned vehicle, or it might be lost when destroyed.",
@@ -1003,7 +1222,7 @@ chat_commands.add{
     end
 }
 
---chat_commands.add{
+--add_chat_command{
 --    command="moregift",
 --    help={
 --        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
@@ -1018,7 +1237,7 @@ chat_commands.add{
 --    },
 --}
 
---chat_commands.add{
+--add_chat_command{
 --    command="gift2",
 --    help={
 --        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
@@ -1035,13 +1254,13 @@ chat_commands.add{
 --    end
 --}
 
-chat_commands.add{
+add_chat_command{
     command="vip",
     help="Request an org invite, useful for ceopay or VIP at casino.",
     func=function(pid, commands)
-        -- Thanks to Totaw Annihiwation for this script event!
+        -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
-            -1129846248,
+            -1643482755,
             players.user(),
             4,
             10000, -- wage?
@@ -1049,24 +1268,26 @@ chat_commands.add{
             0,
             0,
             0,
-            memory.read_int(memory.script_global(1920255 + 9)), -- f_8
-            memory.read_int(memory.script_global(1920255 + 10)), -- f_9
+            memory.read_int(memory.script_global(1923597 + 9)), -- f_8
+            memory.read_int(memory.script_global(1923597 + 10)), -- f_9
         })
+        help_message(pid, "Org invite sent. Please check your phone to accept invite.")
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="cleanup",
     help="Clear unoccupied vehicles from immediate vicinity. Useful for clearing invis vehicles when gifting.",
     func=function(pid, commands)
         local num_deleted = delete_entities_by_range(entities.get_all_vehicles_as_handles(), 100, "VEHICLE", pid)
-        help_message(pid, "Deleted "..num_deleted.." nearby vehicles")
+        local num_deleted_objects = delete_entities_by_range(entities.get_all_objects_as_handles(), 100, "OBJECT", pid)
+        help_message(pid, "Deleted "..num_deleted.." nearby vehicles and "..num_deleted_objects.." objects")
     end
 }
 
 -- Vehicle Commands
 
-chat_commands.add{
+add_chat_command{
     command="spawn",
     help="Spawn a shuffled vehicle",
     func=function(pid, commands)
@@ -1086,29 +1307,29 @@ local function request_control_once(entity)
     return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
 end
 
-chat_commands.add{
-    command="fly",
-    help="Fly a plane",
-    func=function(pid, commands)
-        local vehicle_model_name = "lazer"
-        if commands[2] ~= nil then
-            vehicle_model_name = commands[2]
-        end
-        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
-        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
-            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid, {x=0, y=4, z=30})
-            if vehicle then
-                vehicle_mods_set_max_performance(vehicle)
-                shuffle_vehicle(vehicle)
-                request_control_once(vehicle)
-                PED.SET_PED_INTO_VEHICLE(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), vehicle, -1)
-                VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 100)
-            end
-        end
-    end
-}
+--add_chat_command{
+--    command="fly",
+--    help="Fly a plane",
+--    func=function(pid, commands)
+--        local vehicle_model_name = "lazer"
+--        if commands[2] ~= nil then
+--            vehicle_model_name = commands[2]
+--        end
+--        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
+--        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
+--            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid, {x=0, y=4, z=30})
+--            if vehicle then
+--                vehicle_mods_set_max_performance(vehicle)
+--                shuffle_vehicle(vehicle)
+--                request_control_once(vehicle)
+--                PED.SET_PED_INTO_VEHICLE(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), vehicle, -1)
+--                VEHICLE.SET_VEHICLE_FORWARD_SPEED(vehicle, 100)
+--            end
+--        end
+--    end
+--}
 
-chat_commands.add{
+add_chat_command{
     command="shuffle",
     help="Shuffle your vehicle paint, mods, and wheels",
     func=function(pid, commands)
@@ -1122,7 +1343,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="paint",
     help={
         "Sets your vehicle paint. Allows for color names and paint type options",
@@ -1138,7 +1359,28 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+--add_chat_command{
+--    command="clearcustompaint",
+--    help={
+--        "Sets your vehicle paint. Allows for color names and paint type options",
+--        "Paint types: NORMAL, METALLIC, PEARL, MATTE, METAL, CHROME",
+--        "Example: !paint blue, !paint red and black, !paint metallic green",
+--        "Hex RGB color codes are allowed. Example: !paint #ff0000"
+--    },
+--    func=function(pid, commands)
+--        local vehicle = get_player_vehicle_in_control(pid)
+--        if vehicle then
+--            VEHICLE.CLEAR_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle)
+--            VEHICLE.CLEAR_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle)
+--            --VEHICLE.SET_VEHICLE_COLOURS(vehicle, 151, 151)
+--            VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 151)
+--            VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 151)
+--            help_message(pid, "Custom paint cleared")
+--        end
+--    end
+--}
+
+add_chat_command{
     command="paint2",
     help={
         "Sets your vehicle secondary paint. Allows for color names and paint type options",
@@ -1154,7 +1396,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="mods",
     help="Set the vehicles mods",
     func=function(pid, commands)
@@ -1171,7 +1413,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="wheels",
     help="Set the vehicles wheels",
     func=function(pid, commands)
@@ -1203,7 +1445,7 @@ local function set_extra_color(vehicle, pearl_color, wheel_color)
     memory.free(current_wheel_color)
 end
 
-chat_commands.add{
+add_chat_command{
     command="wheelcolor",
     help="Set the vehicles wheel color",
     func=function(pid, commands)
@@ -1220,7 +1462,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="pearl",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1255,7 +1497,7 @@ local headlight_color_name_map = {
     blacklight = 12
 }
 
-chat_commands.add{
+add_chat_command{
     command="headlights",
     help="Set the vehicle headlights color",
     func=function(pid, commands)
@@ -1275,7 +1517,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="neonlights",
     help="Set the vehicle neon lights color",
     func=function(pid, commands)
@@ -1297,7 +1539,7 @@ chat_commands.add{
 }
 
 
-chat_commands.add{
+add_chat_command{
     command="tiresmoke",
     help="Set the vehicle tire smoke color",
     func=function(pid, commands)
@@ -1315,7 +1557,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="livery",
     help="Set the vehicles livery",
     func=function(pid, commands)
@@ -1326,7 +1568,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="horn",
     help="Set the vehicles horn type",
     func=function(pid, commands)
@@ -1337,7 +1579,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="blinkers",
     help="Set the vehicles blinkers",
     func=function(pid, commands)
@@ -1352,7 +1594,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="plate",
     help="Set the vehicles plate text",
     func=function(pid, commands)
@@ -1363,7 +1605,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="platetype",
     help="Set the vehicles plate type",
     func=function(pid, commands)
@@ -1378,7 +1620,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="repair",
     help="Repairs your current vehicle",
     func=function(pid, commands)
@@ -1390,7 +1632,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="clean",
     help="Removed any dirt from your current vehicle",
     func=function(pid, commands)
@@ -1402,7 +1644,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="strip",
     help="Removes any removable extra parts on the vehicle",
     func=function(pid, commands)
@@ -1418,7 +1660,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="suspension",
     help="Sets suspension height on the vehicle",
     func=function(pid, commands)
@@ -1444,7 +1686,7 @@ local window_tint_map = {
     green = 5,
 }
 
-chat_commands.add{
+add_chat_command{
     command="windowtint",
     help="Sets suspension height on the vehicle",
     func=function(pid, commands)
@@ -1463,7 +1705,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="tires",
     help="Sets tires on the vehicle",
     func=function(pid, commands)
@@ -1495,7 +1737,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="driftmode",
     help="Sets vehicle drift mode",
     func=function(pid, commands)
@@ -1519,24 +1761,26 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
-    command="torque",
-    help="Sets vehicle torque",
+add_chat_command{
+    command="topspeed",
+    help="Sets vehicle top speed",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
-            local torque_value = 1.0
+            local torque_value = 500
             if commands[2] then
-                torque_value = commands[2] / 100
+                torque_value = commands[2]
             end
-            if torque_value == nil then torque_value = 1.0 end
-            VEHICLE.SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, torque_value)
-            help_message(pid, "Vehicle torque "..math.floor(torque_value * 100).. '%')
+            if torque_value == nil then torque_value = 500 end
+            VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, torque_value)
+            ENTITY.SET_ENTITY_MAX_SPEED(vehicle, torque_value)
+            --VEHICLE.SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, torque_value)
+            help_message(pid, "Vehicle top speed "..math.floor(torque_value).. '%')
         end
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="stance",
     help="Lowers suspension on the vehicle",
     func=function(pid, commands)
@@ -1550,7 +1794,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="tune",
     help="Apply maximum performance options",
     func=function(pid, commands)
@@ -1561,7 +1805,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="noclip",
     help="Sets vehicle no clip",
     func=function(pid, commands)
@@ -1576,23 +1820,23 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
-    command="invincible",
-    help="Set vehicle to god mode and prevent all damage",
-    func=function(pid, commands)
-        local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle then
-            local enabled_string = get_on_off_string((commands and commands[2]) or "on")
-            local enabled = (enabled_string == "ON")
-            ENTITY.SET_ENTITY_INVINCIBLE(vehicle, enabled)
-            help_message(pid, "Vehicle invincibility " .. enabled_string)
-        end
-    end
-}
+--add_chat_command{
+--    command="invincible",
+--    help="Set vehicle to god mode and prevent all damage",
+--    func=function(pid, commands)
+--        local vehicle = get_player_vehicle_in_control(pid)
+--        if vehicle then
+--            local enabled_string = get_on_off_string((commands and commands[2]) or "on")
+--            local enabled = (enabled_string == "ON")
+--            ENTITY.SET_ENTITY_INVINCIBLE(vehicle, enabled)
+--            help_message(pid, "Vehicle invincibility " .. enabled_string)
+--        end
+--    end
+--}
 
 -- Self Commands
 
-chat_commands.add{
+add_chat_command{
     command="tpme",
     help="Teleport to a nearby apartment. Good for when stuck in loading screens",
     func=function(pid, commands)
@@ -1600,32 +1844,36 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="tp",
     help="Teleport to your waypoint.",
     func=function(pid, commands)
         -- Copied from ACJokerScript
         local x, y, z, b = players.get_waypoint(pid)
-        if HUD.IS_WAYPOINT_ACTIVE() then
-            local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
-            HUD.SET_WAYPOINT_OFF()
-            HUD.SET_NEW_WAYPOINT(x, y)
-            if pid == players.user() then
-                menu.trigger_commands("tpwp")
-            else
-                menu.trigger_commands("WPTP".. players.get_name(pid))
-            end
-            util.yield(1500)
-            HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+        if x == 0.0 and y == 0.0 then
+            help_message("You must set a waypoint to teleport to")
         else
-            HUD.SET_NEW_WAYPOINT(x, y)
-            menu.trigger_commands("WPTP".. players.get_name(pid))
-            HUD.SET_WAYPOINT_OFF()
+            if HUD.IS_WAYPOINT_ACTIVE() then
+                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
+                HUD.SET_WAYPOINT_OFF()
+                HUD.SET_NEW_WAYPOINT(x, y)
+                if pid == players.user() then
+                    menu.trigger_commands("tpwp")
+                else
+                    menu.trigger_commands("WPTP".. players.get_name(pid))
+                end
+                util.yield(1500)
+                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+            else
+                HUD.SET_NEW_WAYPOINT(x, y)
+                menu.trigger_commands("WPTP".. players.get_name(pid))
+                HUD.SET_WAYPOINT_OFF()
+            end
         end
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="unstick",
     help="Try to get unstuck from infinite loading screen",
     func=function(pid, commands)
@@ -1634,7 +1882,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="allguns",
     help="Get all possible weapons",
     func=function(pid, commands)
@@ -1642,7 +1890,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="autoheal",
     help="Automatically heal any damage as quickly as possible",
     func=function(pid, commands)
@@ -1652,7 +1900,17 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
+    command="otr",
+    help="Go off the radar to hide from other players",
+    func=function(pid, commands)
+        local enabled_string = get_on_off_string((commands and commands[2]) or "on")
+        menu.trigger_commands("giveotr " .. players.get_name(pid) .. " " .. enabled_string)
+        help_message(pid, "Off the radar: " .. enabled_string)
+    end
+}
+
+add_chat_command{
     command="bail",
     help="Avoid all wanted levels",
     func=function(pid, commands)
@@ -1662,7 +1920,7 @@ chat_commands.add{
     end
 }
 
-chat_commands.add{
+add_chat_command{
     command="ammo",
     help="Add ammo for current weapon",
     func=function(pid, commands)
@@ -1670,8 +1928,28 @@ chat_commands.add{
     end
 }
 
+add_chat_command{
+    command="friend",
+    help="Add to friend list for future lobby invites",
+    func=function(pid, commands)
+        if add_friend(pid) then
+            help_message(pid, "You have been added to the friends list and will get lobby invites when available.")
+        end
+    end
+}
+
+add_chat_command{
+    command="unfriend",
+    help="Remove from friend list for future lobby invites",
+    func=function(pid, commands)
+        if remove_friend(pid) then
+            help_message(pid, "You have been removed from the friends list and will no longer get lobby invites.")
+        end
+    end
+}
+
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivela", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C"}) do
+    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivia", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
         if players.get_name(pid) == player_name then
             return true
         end
@@ -1679,17 +1957,17 @@ local function is_player_special(pid)
     return false
 end
 
-chat_commands.add{
+add_chat_command{
     command="bb",
     func=function(pid, commands)
         if is_player_special(pid) then
             help_message(pid, "Special access granted. Attempting to kick "..commands[2])
-            menu.trigger_commands("breakup" .. commands[2])
+            menu.trigger_commands("breakup " .. commands[2])
         end
     end
 }
 
---chat_commands.add{
+--add_chat_command{
 --    command="animal",
 --    help="Turn into a random animal",
 --    func=function(pid, commands)
@@ -1709,7 +1987,7 @@ chat_commands.add{
 
 -- Money commands
 
-chat_commands.add{
+add_chat_command{
     command="ceopay",
     help={
         "Highly increased payouts from being in a SecuroServ Org",
@@ -1736,7 +2014,7 @@ local shitbox_vehicles = {
     "euros",
     "gb200",
 }
-chat_commands.add{
+add_chat_command{
     command="crapbox",
     func=function(pid, commands)
         local shitbox_vehicle =  shitbox_vehicles[math.random(#shitbox_vehicles)]
@@ -1769,12 +2047,13 @@ for _, passthrough_command in passthrough_commands do
             help_message(pid, passthrough_command.help_message)
         end
     end
-    chat_commands.add(args)
+    add_chat_command(args)
 end
 
 -- Handler for all chat commands
 chat.on_message(function(pid, reserved, message_text, is_team_chat)
-    if string.starts(message_text, CHAT_CONTROL_CHARACTER) then
+    local chat_control_character = control_characters[config.chat_control_character_index]
+    if string.starts(message_text, chat_control_character) then
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
             if commands[1] == chat_command.command:lower() and chat_command.func then
@@ -1787,10 +2066,191 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
     end
 end)
 
+---
+--- Lobby Finder
+---
+
+local function is_lobby_empty()
+    local lobby_expiration = util.current_time_millis() + 300000
+    if lobby_expiration > config.lobby_freshness then
+        return false
+    end
+    local players_list = players.list()
+    local num_players = #players_list
+    --util.toast("Num players "..num_players, TOAST_ALL)
+    return num_players < 3
+end
+
+local function find_new_lobby()
+    local lobby_mode = lobby_modes[config.lobby_mode_index]
+    menu.trigger_commands(lobby_mode[4])
+    config.lobby_freshness = util.current_time_millis()
+end
+
+local function enter_casino()
+    menu.trigger_commands("casinotp " .. players.get_name(players.user()))
+end
+
+local function force_org()
+    local org_type = players.get_org_type(players.user())
+    if org_type == -1 then
+        menu.trigger_commands("mcstart")
+    elseif org_type == 0 then
+        menu.trigger_commands("ceotomc")
+    end
+end
+
+---
+--- Bulk Invite
+---
+
+local function array_reverse(x)
+    local n, m = #x, #x/2
+    for i=1, m do
+        x[i], x[n-i+1] = x[n-i+1], x[i]
+    end
+    return x
+end
+
+local function bulk_invite()
+    if PLAYER.GET_NUMBER_OF_PLAYERS() < 20 then
+        for _, friend in pairs(array_reverse(load_friends())) do
+            util.toast("Inviting "..friend.name)
+            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+            util.yield(1000)
+        end
+    end
+end
+
+---
+--- Update Tick
+---
+
+local next_tick_time = util.current_time_millis() + config.tick_handler_delay
+
+local function afk_casino_tick()
+    if not config.afk_mode_in_casino then return end
+    if not is_player_in_casino(players.user()) then
+        enter_casino()
+    else
+        force_roulette_area()
+        bulk_invite()
+    end
+end
+
+local next_announcement_time
+
+local function reset_announcement_timer()
+    next_announcement_time = util.current_time_millis() + (config.announce_delay * 60000)
+end
+reset_announcement_timer()
+
+local function announce_to_lobby()
+    announce_message("Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help")
+    if config.afk_mode_in_casino and is_player_in_casino(players.user()) then
+        announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !roulette")
+    end
+    reset_announcement_timer()
+end
+
+
+local function announcement_tick()
+    if util.current_time_millis() > next_announcement_time then
+        announce_to_lobby()
+    end
+end
+
+local function afk_mode_tick()
+    if config.afk_mode then
+        if util.current_time_millis() > next_tick_time then
+            next_tick_time = util.current_time_millis() + config.tick_handler_delay
+            force_org()
+            if is_lobby_empty() then
+                find_new_lobby()
+            else
+                afk_casino_tick()
+                announcement_tick()
+            end
+        end
+    end
+    return true
+end
+
+---
+--- Root Menu
+---
+
+menu.toggle(menu.my_root(), "AFK Mode", {}, "If enabled, you will auto join new lobby when alone.", function(toggle)
+    config.afk_mode = toggle
+end, config.afk_mode)
+
+local chat_commands_menu_list = menu.list(menu.my_root(), "Chat Commands")
+for _, chat_command in pairs(chat_commands) do
+    if type(chat_command) ~= "table" then
+        util.toast("Invalid chat command "..inspect(chat_command), TOAST_ALL)
+    else
+        menu.action(
+                chat_commands_menu_list,
+                chat_command.command,
+                {chat_command.override_action_command or chat_command.command},
+                get_menu_action_help(chat_command),
+                function(click_type, pid)
+                    if chat_command.func ~= nil then
+                        return chat_command.func(pid, {chat_command.command}, chat_command)
+                    else
+                        return help_message(pid, chat_command.help)
+                    end
+                end
+        )
+    end
+end
+
+menu.action(menu.my_root(), "Announce", {}, "", function()
+    announce_to_lobby()
+end)
+
+local friends_menus = {}
+local friends_menu
+friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
+    for _, friend_menu in pairs(friends_menus) do
+        if friend_menu:isValid() then
+            menu.delete(friend_menu)
+        end
+    end
+    for _, friend in pairs(load_friends()) do
+        local friend_menu = menu.list(friends_menu, friend.name)
+        menu.action(friend_menu, "Invite", {}, "", function()
+            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+        end)
+        table.insert(friends_menus, friend_menu)
+    end
+end)
+
+menu.action(menu.my_root(), "Bulk Invite", {}, "", function()
+    bulk_invite()
+end)
+
+
+---
+--- Options Menu
+---
+
 local menu_options = menu.list(menu.my_root(), "Options")
+menu.list_select(menu_options, "Chat Control Character", {}, "Set the character that chat commands must begin with", control_characters, config.chat_control_character_index, function(index)
+    config.chat_control_character_index = index
+end)
 menu.toggle(menu_options, "Auto-Spectate Far Away Players", {}, "If enabled, you will automatically spectate players who issue commands from far away. Without this far away players will get an error when issuing commands.", function(toggle)
     config.auto_spectate_far_away_players = toggle
 end, config.auto_spectate_far_away_players)
+menu.slider(menu_options, "Num Spawns Allowed Per Player", {}, "The maximum number of vehicle spawns allowed per player. Once this number is reached, additional spawns will delete the oldest spawned vehicle.", 0, 5, config.num_allowed_spawned_vehicles_per_player, 1, function(value)
+    config.num_allowed_spawned_vehicles_per_player = value
+end)
+menu.list_select(menu_options, "AFK Lobby Type", {}, "When in AFK mode and alone in a lobby, what type of lobby should you switch to.", lobby_modes, config.lobby_mode_index, function(index)
+    config.lobby_mode_index = index
+end)
+menu.toggle(menu_options, "AFK in Casino", {}, "Keep roulette rigged for others while AFK.", function(toggle)
+    config.afk_mode_in_casino = toggle
+end, config.afk_mode_in_casino)
 
 ---
 --- Script Meta Menu
@@ -1818,7 +2278,4 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 --- Run
 ---
 
-util.create_tick_handler(function()
-    return true
-end)
-
+util.create_tick_handler(afk_mode_tick)
