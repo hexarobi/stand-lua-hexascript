@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b2"
+local SCRIPT_VERSION = "0.14b3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -130,7 +130,8 @@ local config = {
     lobby_mode_index = 2,
     tick_handler_delay = 60000,
     announce_delay = 60,
-    lobby_freshness = util.current_time_millis(),
+    lobby_created_at = util.current_time_millis(),
+    fresh_lobby_delay = 600000,
 }
 
 local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
@@ -2067,20 +2068,23 @@ end)
 ---
 
 local function is_lobby_empty()
-    local lobby_expiration = util.current_time_millis() + 600000
-    if lobby_expiration > config.lobby_freshness then
-        return false
-    end
     local players_list = players.list()
     local num_players = #players_list
     --util.toast("Num players "..num_players, TOAST_ALL)
     return num_players < 3
 end
 
+local function should_find_new_lobby()
+    if util.current_time_millis() < config.lobby_created_at + config.fresh_lobby_delay then
+        return false
+    end
+    return is_lobby_empty()
+end
+
 local function find_new_lobby()
+    config.lobby_created_at = util.current_time_millis()
     local lobby_mode = lobby_modes[config.lobby_mode_index]
     menu.trigger_commands(lobby_mode[4])
-    config.lobby_freshness = util.current_time_millis()
 end
 
 local function enter_casino()
@@ -2161,7 +2165,7 @@ local function afk_mode_tick()
         if util.current_time_millis() > next_tick_time then
             next_tick_time = util.current_time_millis() + config.tick_handler_delay
             force_org()
-            if is_lobby_empty() then
+            if should_find_new_lobby() then
                 find_new_lobby()
             else
                 afk_casino_tick()
