@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13"
+local SCRIPT_VERSION = "0.13.1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -130,6 +130,7 @@ local config = {
     lobby_mode_index = 2,
     tick_handler_delay = 60000,
     announce_delay = 60,
+    lobby_freshness = util.current_time_millis(),
 }
 
 local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
@@ -2066,7 +2067,7 @@ end)
 ---
 
 local function is_lobby_empty()
-    local lobby_expiration = util.current_time_millis() + 300000
+    local lobby_expiration = util.current_time_millis() + 600000
     if lobby_expiration > config.lobby_freshness then
         return false
     end
