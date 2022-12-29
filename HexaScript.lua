@@ -3,12 +3,12 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13b12"
+local SCRIPT_VERSION = "0.13"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
-local SELECTED_BRANCH_INDEX = 2
+local SELECTED_BRANCH_INDEX = 1
 local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
 
 ---
@@ -106,6 +106,14 @@ local constants = libs.constants
 local colorsRGB = libs.colors
 --local inspect = libs.inspect
 
+local vehicles_list = {}
+local file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
+if file then
+    for line in file:lines() do
+        table.insert(vehicles_list, line)
+    end
+end
+
 ---
 --- Config
 ---
@@ -119,7 +127,7 @@ local config = {
     chat_control_character_index = 1,
     num_allowed_spawned_vehicles_per_player = 2,
     auto_spectate_far_away_players = true,
-    lobby_mode_index = 1,
+    lobby_mode_index = 2,
     tick_handler_delay = 60000,
     announce_delay = 60,
 }
@@ -167,6 +175,19 @@ local function add_friend(pid)
     table.insert(friends_list, new_friend)
     save_friends(friends_list)
     return true
+end
+
+local function remove_friend(pid)
+    local rockstar_id = players.get_rockstar_id(pid)
+    local friends_list = load_friends()
+    for index, friend in pairs(friends_list) do
+        if friend.rockstar_id == rockstar_id then
+            friends_list[index] = nil
+            save_friends(friends_list)
+            return true
+        end
+    end
+    return false
 end
 
 local function is_friend_in_lobby(current_lobby_rockstar_ids, friend)
@@ -309,6 +330,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     bennysvoodoo = "voodoo",
     bennysgauntlet = "gauntlet5",
     mt = "entity3",
+    entitymt = "entity3",
     minirally = "issi8",
     minisport = "issi7",
     panther = "panthere",
@@ -1006,18 +1028,19 @@ local function strsplit(inputstr, sep)
 end
 
 local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
-    if vehicle_model_name then
-        vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
-        if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
-            local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
-            if vehicle then
-                max_mods(vehicle)
-                shuffle_wheels(vehicle)
-                shuffle_paint(vehicle)
-                shuffle_livery(vehicle)
-                --vehicle_set_nameplate(vehicle, players.get_name(pid))
-                return false
-            end
+    if vehicle_model_name == nil or vehicle_model_name == "" then
+        vehicle_model_name = vehicles_list[math.random(#vehicles_list)]
+    end
+    vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
+    if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
+        local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
+        if vehicle then
+            max_mods(vehicle)
+            shuffle_wheels(vehicle)
+            shuffle_paint(vehicle)
+            shuffle_livery(vehicle)
+            --vehicle_set_nameplate(vehicle, players.get_name(pid))
+            return false
         end
     end
 end
@@ -1257,7 +1280,8 @@ add_chat_command{
     help="Clear unoccupied vehicles from immediate vicinity. Useful for clearing invis vehicles when gifting.",
     func=function(pid, commands)
         local num_deleted = delete_entities_by_range(entities.get_all_vehicles_as_handles(), 100, "VEHICLE", pid)
-        help_message(pid, "Deleted "..num_deleted.." nearby vehicles")
+        local num_deleted_objects = delete_entities_by_range(entities.get_all_objects_as_handles(), 100, "OBJECT", pid)
+        help_message(pid, "Deleted "..num_deleted.." nearby vehicles and "..num_deleted_objects.." objects")
     end
 }
 
@@ -1271,23 +1295,6 @@ add_chat_command{
         if vehicle then
             spawn_shuffled_vehicle_for_player(commands[2], pid)
         end
-    end
-}
-
-local vehicles_list = {}
-local file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
-if file then
-    for line in file:lines() do
-        table.insert(vehicles_list, line)
-    end
-end
-
-add_chat_command{
-    command="car",
-    help="Spawn a random vehicle",
-    func=function(pid, commands)
-        local model_name = vehicles_list[math.random(#vehicles_list)]
-        spawn_shuffled_vehicle_for_player(model_name, pid)
     end
 }
 
@@ -1755,18 +1762,20 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="torque",
-    help="Sets vehicle torque",
+    command="topspeed",
+    help="Sets vehicle top speed",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
-            local torque_value = 1.0
+            local torque_value = 500
             if commands[2] then
-                torque_value = commands[2] / 100
+                torque_value = commands[2]
             end
-            if torque_value == nil then torque_value = 1.0 end
-            VEHICLE.SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, torque_value)
-            help_message(pid, "Vehicle torque "..math.floor(torque_value * 100).. '%')
+            if torque_value == nil then torque_value = 500 end
+            VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, torque_value)
+            ENTITY.SET_ENTITY_MAX_SPEED(vehicle, torque_value)
+            --VEHICLE.SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, torque_value)
+            help_message(pid, "Vehicle top speed "..math.floor(torque_value).. '%')
         end
     end
 }
@@ -1841,21 +1850,25 @@ add_chat_command{
     func=function(pid, commands)
         -- Copied from ACJokerScript
         local x, y, z, b = players.get_waypoint(pid)
-        if HUD.IS_WAYPOINT_ACTIVE() then
-            local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
-            HUD.SET_WAYPOINT_OFF()
-            HUD.SET_NEW_WAYPOINT(x, y)
-            if pid == players.user() then
-                menu.trigger_commands("tpwp")
-            else
-                menu.trigger_commands("WPTP".. players.get_name(pid))
-            end
-            util.yield(1500)
-            HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+        if x == 0.0 and y == 0.0 then
+            help_message("You must set a waypoint to teleport to")
         else
-            HUD.SET_NEW_WAYPOINT(x, y)
-            menu.trigger_commands("WPTP".. players.get_name(pid))
-            HUD.SET_WAYPOINT_OFF()
+            if HUD.IS_WAYPOINT_ACTIVE() then
+                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
+                HUD.SET_WAYPOINT_OFF()
+                HUD.SET_NEW_WAYPOINT(x, y)
+                if pid == players.user() then
+                    menu.trigger_commands("tpwp")
+                else
+                    menu.trigger_commands("WPTP".. players.get_name(pid))
+                end
+                util.yield(1500)
+                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+            else
+                HUD.SET_NEW_WAYPOINT(x, y)
+                menu.trigger_commands("WPTP".. players.get_name(pid))
+                HUD.SET_WAYPOINT_OFF()
+            end
         end
     end
 }
@@ -1925,6 +1938,15 @@ add_chat_command{
     end
 }
 
+add_chat_command{
+    command="unfriend",
+    help="Remove from friend list for future lobby invites",
+    func=function(pid, commands)
+        if remove_friend(pid) then
+            help_message(pid, "You have been removed from the friends list and will no longer get lobby invites.")
+        end
+    end
+}
 
 local function is_player_special(pid)
     for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivia", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
@@ -2049,6 +2071,10 @@ end)
 ---
 
 local function is_lobby_empty()
+    local lobby_expiration = util.current_time_millis() + 300000
+    if lobby_expiration > config.lobby_freshness then
+        return false
+    end
     local players_list = players.list()
     local num_players = #players_list
     --util.toast("Num players "..num_players, TOAST_ALL)
@@ -2058,6 +2084,7 @@ end
 local function find_new_lobby()
     local lobby_mode = lobby_modes[config.lobby_mode_index]
     menu.trigger_commands(lobby_mode[4])
+    config.lobby_freshness = util.current_time_millis()
 end
 
 local function enter_casino()
@@ -2074,6 +2101,28 @@ local function force_org()
 end
 
 ---
+--- Bulk Invite
+---
+
+local function array_reverse(x)
+    local n, m = #x, #x/2
+    for i=1, m do
+        x[i], x[n-i+1] = x[n-i+1], x[i]
+    end
+    return x
+end
+
+local function bulk_invite()
+    if PLAYER.GET_NUMBER_OF_PLAYERS() < 20 then
+        for _, friend in pairs(array_reverse(load_friends())) do
+            util.toast("Inviting "..friend.name)
+            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+            util.yield(1000)
+        end
+    end
+end
+
+---
 --- Update Tick
 ---
 
@@ -2085,6 +2134,7 @@ local function afk_casino_tick()
         enter_casino()
     else
         force_roulette_area()
+        bulk_invite()
     end
 end
 
@@ -2125,7 +2175,6 @@ local function afk_mode_tick()
     end
     return true
 end
-
 
 ---
 --- Root Menu
@@ -2178,11 +2227,7 @@ friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
 end)
 
 menu.action(menu.my_root(), "Bulk Invite", {}, "", function()
-    for _, friend in pairs(load_friends()) do
-        util.toast("Inviting "..friend.name)
-        menu.trigger_commands("ridinvite "..friend.rockstar_id)
-        util.yield(5000)
-    end
+    bulk_invite()
 end)
 
 
