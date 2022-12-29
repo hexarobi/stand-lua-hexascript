@@ -3,12 +3,12 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.13"
+local SCRIPT_VERSION = "0.14b1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
-local SELECTED_BRANCH_INDEX = 1
+local SELECTED_BRANCH_INDEX = 2
 local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
 
 ---
@@ -362,11 +362,6 @@ local passthrough_commands = {
 --        outbound_command="casinojoin",
 --        requires_player_name=true,
 --    },
-    {
-        command="tele",
-        outbound_command="tele",
-        requires_player_name=true,
-    },
     {
         command="casinotp",
         outbound_command="casinotp",
