@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b3"
+local SCRIPT_VERSION = "0.14b4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -132,6 +132,7 @@ local config = {
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
     fresh_lobby_delay = 600000,
+    min_num_players = 3,
 }
 
 local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
@@ -2070,8 +2071,7 @@ end)
 local function is_lobby_empty()
     local players_list = players.list()
     local num_players = #players_list
-    --util.toast("Num players "..num_players, TOAST_ALL)
-    return num_players < 3
+    return num_players < config.min_num_players
 end
 
 local function should_find_new_lobby()
@@ -2251,6 +2251,9 @@ end)
 menu.toggle(menu_options, "AFK in Casino", {}, "Keep roulette rigged for others while AFK.", function(toggle)
     config.afk_mode_in_casino = toggle
 end, config.afk_mode_in_casino)
+menu.slider(menu_options, "Min Players in Lobby", {}, "If in AFK mode, will try to stay in a lobby with at least this many players.", 0, 30, config.min_num_players, 1, function(val)
+    config.min_num_players = val
+end, config.min_num_players)
 
 ---
 --- Script Meta Menu
