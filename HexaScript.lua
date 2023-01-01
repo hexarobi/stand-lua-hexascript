@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b4"
+local SCRIPT_VERSION = "0.14b5"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -118,7 +118,7 @@ end
 --- Config
 ---
 
-local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&"}
+local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&", "*"}
 
 local config = {
     afk_mode = false,
@@ -132,6 +132,7 @@ local config = {
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
     fresh_lobby_delay = 600000,
+    delay_between_bulk_invites = 30000,
     min_num_players = 3,
 }
 
@@ -345,6 +346,7 @@ local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     jet = 2,
     cargoplane = 3,
     tug = 4,
+    cargoplane2 = 5,
     --alkonost = 4,
     --titan = 5,
     --volatol = 6,
@@ -965,7 +967,7 @@ local function get_player_vehicle_in_control(pid, opts)
     if opts and opts.near_only and vehicle == 0 then
         return 0
     end
-    if vehicle == 0 and target_ped ~= my_ped and dist > 340000 and not was_spectating then
+    if vehicle == 0 and target_ped ~= my_ped and dist > 750000 and not was_spectating then
         if not config.auto_spectate_far_away_players then
             help_message(pid, "Sorry, you are too far away right now, please try again later")
             return
@@ -2127,14 +2129,18 @@ end
 ---
 
 local next_tick_time = util.current_time_millis() + config.tick_handler_delay
-
+local last_bulk_invite_time
 local function afk_casino_tick()
     if not config.afk_mode_in_casino then return end
     if not is_player_in_casino(players.user()) then
         enter_casino()
     else
         force_roulette_area()
-        bulk_invite()
+        if (last_bulk_invite_time == nil) or ((last_bulk_invite_time + config.delay_between_bulk_invites) < util.current_time_millis()) then
+            util.log("Bulk inviting")
+            bulk_invite()
+            last_bulk_invite_time = util.current_time_millis()
+        end
     end
 end
 
