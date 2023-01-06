@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b5"
+local SCRIPT_VERSION = "0.14b6"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -132,8 +132,10 @@ local config = {
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
     fresh_lobby_delay = 600000,
-    delay_between_bulk_invites = 30000,
+    delay_between_bulk_invites = 1500000,
     min_num_players = 3,
+    user_max_commands_per_time = 3,
+    user_command_time = 30000
 }
 
 local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
@@ -203,18 +205,18 @@ local function is_friend_in_lobby(current_lobby_rockstar_ids, friend)
     return false
 end
 
-local function invite_friends_to_lobby()
-    local current_lobby_rockstar_ids = {}
-    for _, player_id in pairs(players.list()) do
-        table.insert(current_lobby_rockstar_ids, players.get_rockstar_id(player_id))
-    end
-    local friends_list = load_friends()
-    for _, friend in pairs(friends_list) do
-        if not is_friend_in_lobby(current_lobby_rockstar_ids, friend) then
-            menu.trigger_commands("ridinvite "..friend.rockstar_id)
-        end
-    end
-end
+--local function invite_friends_to_lobby()
+--    local current_lobby_rockstar_ids = {}
+--    for _, player_id in pairs(players.list()) do
+--        table.insert(current_lobby_rockstar_ids, players.get_rockstar_id(player_id))
+--    end
+--    local friends_list = load_friends()
+--    for _, friend in pairs(friends_list) do
+--        if not is_friend_in_lobby(current_lobby_rockstar_ids, friend) then
+--            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+--        end
+--    end
+--end
 
 local lobby_modes = {
     { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
@@ -233,7 +235,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     op = "oppressor",
     op2 = "oppressor2",
     br8 = "openwheel1",
-    dr2 = "openwheel2",
+    dr1 = "openwheel2",
     pr4 = "formula",
     r88 = "formula2",
     b11 = "strikeforce",
@@ -341,13 +343,19 @@ local VEHICLE_MODEL_SHORTCUTS = {
     ["300r"] = "r300",
     m100 = "tulip2",
 }
+
+local vehicles_with_invalid_mods = {
+    "entity3",
+    "issi8",
+}
+
 local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
     kosatka = 1,
     jet = 2,
     cargoplane = 3,
     tug = 4,
     cargoplane2 = 5,
-    --alkonost = 4,
+    alkonost = 6,
     --titan = 5,
     --volatol = 6,
 }
@@ -570,9 +578,17 @@ local function spawn_vehicle_for_player(model_name, pid, offset)
     end
 end
 
+local function does_vehicle_have_invalid_mods(vehicle)
+    local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle))
+    for _, banned_model in pairs(vehicles_with_invalid_mods) do
+        if model == banned_model then return true end
+    end
+    return false
+end
+
 local function vehicle_set_mod_max_value(vehicle, vehicle_mod)
-    -- Dont apply max mods to entity3 to avoid crashes
-    if util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle)) == "entity3" then return -1 end
+    -- Don't apply max mods to vehicles with invalid mods to avoid crashing players
+    if does_vehicle_have_invalid_mods(vehicle) then return end
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
     if vehicle_mod == 34 then max = -1 end  -- Don't set shifters to avoid crash
     VEHICLE.SET_VEHICLE_MOD(vehicle, vehicle_mod, max)
@@ -967,7 +983,7 @@ local function get_player_vehicle_in_control(pid, opts)
     if opts and opts.near_only and vehicle == 0 then
         return 0
     end
-    if vehicle == 0 and target_ped ~= my_ped and dist > 750000 and not was_spectating then
+    if vehicle == 0 and target_ped ~= my_ped and dist > 340000 and not was_spectating then
         if not config.auto_spectate_far_away_players then
             help_message(pid, "Sorry, you are too far away right now, please try again later")
             return
@@ -1506,7 +1522,7 @@ add_chat_command{
             local color_number = tonumber(commands[2])
             local color_name = commands[2]
             if headlight_color_name_map[color_name] ~= nil then color_number = headlight_color_name_map[color_name] end
-            if color_number < -1 or color_number > 12 then
+            if color_number == nil or color_number < -1 or color_number > 12 then
                 help_message(pid, "Invalid color")
                 return
             end
@@ -2050,6 +2066,39 @@ for _, passthrough_command in passthrough_commands do
     add_chat_command(args)
 end
 
+local user_command_log = {}
+
+local function build_new_user_log(commands_log)
+    local new_user_log = {}
+    local expired_time = util.current_time_millis() - config.user_command_time
+    for _, log_item in pairs(commands_log) do
+        if log_item.time > expired_time then
+            table.insert(new_user_log, log_item)
+        end
+    end
+    return new_user_log
+end
+
+local function is_user_allowed_to_issue_chat_command(pid, commands)
+    local rockstar_id = players.get_rockstar_id(pid)
+    if user_command_log[rockstar_id] == nil then user_command_log[rockstar_id] = {} end
+
+    local new_user_log = build_new_user_log(user_command_log[rockstar_id])
+    if #new_user_log > (config.user_max_commands_per_time - 1) then
+        help_message(pid, "Please slow down your commands.")
+        return false
+    end
+
+    local new_log_item = {
+        time=util.current_time_millis(),
+        commands=commands
+    }
+    table.insert(new_user_log, new_log_item)
+    user_command_log[rockstar_id] = new_user_log
+    --util.toast("Tracked command for "..players.get_name(pid).." "..#new_user_log)
+    return true
+end
+
 -- Handler for all chat commands
 chat.on_message(function(pid, reserved, message_text, is_team_chat)
     local chat_control_character = control_characters[config.chat_control_character_index]
@@ -2057,7 +2106,9 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
             if commands[1] == chat_command.command:lower() and chat_command.func then
-                chat_command.func(pid, commands, chat_command)
+                if is_user_allowed_to_issue_chat_command(pid, commands) then
+                    chat_command.func(pid, commands, chat_command)
+                end
                 return
             end
         end
@@ -2119,7 +2170,7 @@ local function bulk_invite()
         for _, friend in pairs(array_reverse(load_friends())) do
             util.toast("Inviting "..friend.name)
             menu.trigger_commands("ridinvite "..friend.rockstar_id)
-            util.yield(1000)
+            util.yield(500)
         end
     end
 end
@@ -2129,17 +2180,18 @@ end
 ---
 
 local next_tick_time = util.current_time_millis() + config.tick_handler_delay
-local last_bulk_invite_time
+local next_bulk_invite_time
 local function afk_casino_tick()
     if not config.afk_mode_in_casino then return end
     if not is_player_in_casino(players.user()) then
         enter_casino()
     else
         force_roulette_area()
-        if (last_bulk_invite_time == nil) or ((last_bulk_invite_time + config.delay_between_bulk_invites) < util.current_time_millis()) then
-            util.log("Bulk inviting")
+        if (next_bulk_invite_time == nil) or (next_bulk_invite_time < util.current_time_millis()) then
+            util.toast("Bulk inviting "..tostring(next_bulk_invite_time).." > "..util.current_time_millis(), TOAST_ALL)
             bulk_invite()
-            last_bulk_invite_time = util.current_time_millis()
+            next_bulk_invite_time = (util.current_time_millis() + config.delay_between_bulk_invites)
+            util.toast("Next invite time "..next_bulk_invite_time, TOAST_ALL)
         end
     end
 end
