@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b8"
+local SCRIPT_VERSION = "0.14b9"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -407,6 +407,7 @@ local function load_spawnable_names_from_dir(directory)
 end
 
 local function load_all_spawnable_names_from_dir(directory)
+    if not filesystem.exists(directory) then return {} end
     local spawnable_names = load_spawnable_names_from_dir(directory)
     for _, filepath in ipairs(filesystem.list_files(directory)) do
         if filesystem.is_dir(filepath) then
