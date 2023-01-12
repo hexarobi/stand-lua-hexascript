@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b6"
+local SCRIPT_VERSION = "0.14b7"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -392,8 +392,8 @@ local passthrough_commands = {
 --- Constructor Spawnable Constructs Passthrough Commands
 ---
 
-local CONSTRUCTS_DIR = filesystem.stand_dir() .. 'Constructs\\'
-local SPAWNABLE_DIR = CONSTRUCTS_DIR.."/spawnable"
+local CONSTRUCTS_DIR = filesystem.stand_dir() .. 'Constructs/'
+local SPAWNABLE_DIR = CONSTRUCTS_DIR.."spawnable"
 
 local function load_spawnable_names_from_dir(directory)
     local spawnable_names = {}
