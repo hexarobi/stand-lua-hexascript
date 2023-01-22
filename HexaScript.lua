@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b9"
+local SCRIPT_VERSION = "0.14b10"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -68,13 +68,13 @@ local auto_update_config = {
             script_relpath="lib/hexascript/vehicles.txt",
             switch_to_branch=selected_branch,
         },
-        {
-            name="natives-1651208000",
-            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/natives-1651208000.lua",
-            script_relpath="lib/natives-1651208000.lua",
-            verify_file_begins_with="--",
-            is_required=true,
-        },
+        --{
+        --    name="natives-1651208000",
+        --    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/natives-1651208000.lua",
+        --    script_relpath="lib/natives-1651208000.lua",
+        --    verify_file_begins_with="--",
+        --    is_required=true,
+        --},
         --{
         --    name="inspect",
         --    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
@@ -105,6 +105,8 @@ end
 local constants = libs.constants
 local colorsRGB = libs.colors
 --local inspect = libs.inspect
+
+util.require_natives(1672190175)
 
 local vehicles_list = {}
 local file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
@@ -282,6 +284,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     x80 = "prototipo",
     rattruck = "ratloader2",
     liberator = "monster",
+    ruiner2000 = "ruiner2",
     -- Thanks EndGame for additional aliases!
     d10 = "coquette4",
     xxr = "entity2",
@@ -1549,7 +1552,7 @@ add_chat_command{
             VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
             VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
             VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
-            VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle, color[1], color[2], color[3])
+            VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle, color.r, color.g, color.b)
             help_message(pid, "Set vehicle neon lights color to "..commands[2])
         end
     end
@@ -1803,10 +1806,25 @@ add_chat_command{
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
-            local enabled_string = get_on_off_string(commands[2])
-            VEHICLE._SET_REDUCE_DRIFT_VEHICLE_SUSPENSION(vehicle, get_on_off(commands[2]))
-            -- VEHICLE._SET_CAMBERED_WHEELS_DISABLED(vehicle, 0)
-            help_message(pid, "Vehicle stance "..enabled_string)
+            if commands[2] == "on" then
+                for wheel_index = 0, 5 do
+                    VEHICLE.SET_TYRE_WEAR_RATE(vehicle, wheel_index, 1.01)
+                    VEHICLE.SET_TYRE_HEALTH(vehicle, wheel_index, 400.0)
+                end
+            elseif commands[2] == "low" then
+                for wheel_index = 0, 5 do
+                    VEHICLE.SET_TYRE_WEAR_RATE(vehicle, wheel_index, 1.01)
+                    VEHICLE.SET_TYRE_HEALTH(vehicle, wheel_index, 0.0)
+                end
+            elseif commands[2] == "off" then
+                for wheel_index = 0, 5 do
+                    VEHICLE.SET_TYRE_WEAR_RATE(vehicle, wheel_index, 1.0)
+                    VEHICLE.SET_TYRE_HEALTH(vehicle, wheel_index, 1000.0)
+                end
+            else
+                return
+            end
+            help_message(pid, "Vehicle stance "..commands[2])
         end
     end
 }
@@ -1818,6 +1836,7 @@ add_chat_command{
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             vehicle_mods_set_max_performance(vehicle)
+            help_message(pid, "Applied maximum performance options")
         end
     end
 }
@@ -1861,34 +1880,34 @@ add_chat_command{
     end
 }
 
-add_chat_command{
-    command="tp",
-    help="Teleport to your waypoint.",
-    func=function(pid, commands)
-        -- Copied from ACJokerScript
-        local x, y, z, b = players.get_waypoint(pid)
-        if x == 0.0 and y == 0.0 then
-            help_message("You must set a waypoint to teleport to")
-        else
-            if HUD.IS_WAYPOINT_ACTIVE() then
-                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
-                HUD.SET_WAYPOINT_OFF()
-                HUD.SET_NEW_WAYPOINT(x, y)
-                if pid == players.user() then
-                    menu.trigger_commands("tpwp")
-                else
-                    menu.trigger_commands("WPTP".. players.get_name(pid))
-                end
-                util.yield(1500)
-                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
-            else
-                HUD.SET_NEW_WAYPOINT(x, y)
-                menu.trigger_commands("WPTP".. players.get_name(pid))
-                HUD.SET_WAYPOINT_OFF()
-            end
-        end
-    end
-}
+--add_chat_command{
+--    command="tp",
+--    help="Teleport to your waypoint.",
+--    func=function(pid, commands)
+--        -- Copied from ACJokerScript
+--        local x, y, z, b = players.get_waypoint(pid)
+--        if x == 0.0 and y == 0.0 then
+--            help_message("You must set a waypoint to teleport to")
+--        else
+--            if HUD.IS_WAYPOINT_ACTIVE() then
+--                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
+--                HUD.SET_WAYPOINT_OFF()
+--                HUD.SET_NEW_WAYPOINT(x, y)
+--                if pid == players.user() then
+--                    menu.trigger_commands("tpwp")
+--                else
+--                    menu.trigger_commands("WPTP".. players.get_name(pid))
+--                end
+--                util.yield(1500)
+--                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+--            else
+--                HUD.SET_NEW_WAYPOINT(x, y)
+--                menu.trigger_commands("WPTP".. players.get_name(pid))
+--                HUD.SET_WAYPOINT_OFF()
+--            end
+--        end
+--    end
+--}
 
 add_chat_command{
     command="unstick",
@@ -1966,7 +1985,7 @@ add_chat_command{
 }
 
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyTrivia", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
+    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyT", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
         if players.get_name(pid) == player_name then
             return true
         end
@@ -2188,12 +2207,13 @@ local function afk_casino_tick()
         enter_casino()
     else
         force_roulette_area()
-        if (next_bulk_invite_time == nil) or (next_bulk_invite_time < util.current_time_millis()) then
-            util.toast("Bulk inviting "..tostring(next_bulk_invite_time).." > "..util.current_time_millis(), TOAST_ALL)
-            bulk_invite()
-            next_bulk_invite_time = (util.current_time_millis() + config.delay_between_bulk_invites)
-            util.toast("Next invite time "..next_bulk_invite_time, TOAST_ALL)
-        end
+        -- This doesnt seem to work for non-friends :(
+        --if (next_bulk_invite_time == nil) or (next_bulk_invite_time < util.current_time_millis()) then
+        --    util.toast("Bulk inviting "..tostring(next_bulk_invite_time).." > "..util.current_time_millis(), TOAST_ALL)
+        --    bulk_invite()
+        --    next_bulk_invite_time = (util.current_time_millis() + config.delay_between_bulk_invites)
+        --    util.toast("Next invite time "..next_bulk_invite_time, TOAST_ALL)
+        --end
     end
 end
 
