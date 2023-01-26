@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b10"
+local SCRIPT_VERSION = "0.14b11"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -716,7 +716,7 @@ local function shuffle_mods(vehicle)
     for x = 17, 22 do
         VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, x, math.random() > 0.5)
     end
-    VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, math.random(-1, 12))
+    VEHICLE.SET_VEHICLE_XENON_LIGHT_COLOR_INDEX(vehicle, math.random(-1, 12))
 end
 
 local function shuffle_livery(vehicle, pid, livery_number)
@@ -932,8 +932,8 @@ local function vehicle_set_plate(vehicle, plate_text)
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
 end
 
-local function get_enum_value_name(enum, enum_value)
-    for key, value in pairs(enum) do
+local function get_enum_value_name(enum_name, enum_value)
+    for key, value in pairs(enum_name) do
         if enum_value == value then
             return key
         end
@@ -1531,7 +1531,7 @@ add_chat_command{
                 return
             end
             VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
-            VEHICLE._SET_VEHICLE_XENON_LIGHTS_COLOR(vehicle, color_number)
+            VEHICLE.SET_VEHICLE_XENON_LIGHT_COLOR_INDEX(vehicle, color_number)
             help_message(pid, "Set vehicle headlight color to "..color_number)
         end
     end
@@ -1548,11 +1548,11 @@ add_chat_command{
                 help_message(pid, "Invalid color")
                 return
             end
-            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 0, true)
-            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 1, true)
-            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 2, true)
-            VEHICLE._SET_VEHICLE_NEON_LIGHT_ENABLED(vehicle, 3, true)
-            VEHICLE._SET_VEHICLE_NEON_LIGHTS_COLOUR(vehicle, color.r, color.g, color.b)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 0, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 1, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 2, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 3, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, color.r, color.g, color.b)
             help_message(pid, "Set vehicle neon lights color to "..commands[2])
         end
     end
@@ -1745,12 +1745,12 @@ add_chat_command{
             end
             if commands[2] == "drift" then
                 VEHICLE.SET_VEHICLE_REDUCE_GRIP(vehicle, true)
-                VEHICLE._SET_VEHICLE_REDUCE_TRACTION(vehicle, 3)
+                VEHICLE.SET_VEHICLE_REDUCE_GRIP_LEVEL(vehicle, 3)
                 help_message(pid, "Vehicle tires drift")
             end
             if commands[2] == "stock" then
                 VEHICLE.SET_VEHICLE_REDUCE_GRIP(vehicle, false)
-                VEHICLE._SET_VEHICLE_REDUCE_TRACTION(vehicle, 1.0)
+                VEHICLE.SET_VEHICLE_REDUCE_GRIP_LEVEL(vehicle, 1.0)
                 help_message(pid, "Vehicle tires stock[")
             end
         end
