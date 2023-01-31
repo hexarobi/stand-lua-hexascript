@@ -3,13 +3,14 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b11"
+local SCRIPT_VERSION = "0.14b12"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
 local SELECTED_BRANCH_INDEX = 2
 local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
+util.set_busy(true)
 
 ---
 --- Auto-Updater Lib Install
@@ -2361,3 +2362,4 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 ---
 
 util.create_tick_handler(afk_mode_tick)
+util.set_busy(false)
