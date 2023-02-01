@@ -3,31 +3,30 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b12"
+local SCRIPT_VERSION = "0.14b13"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
 }
 local SELECTED_BRANCH_INDEX = 2
 local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
-util.set_busy(true)
 
 ---
 --- Auto-Updater Lib Install
 ---
 
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
-local status, auto_updater = pcall(require, "auto-updater")
+local status, auto_updater = pcall(require, "auto-updater-dev")
 if not status then
     local auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
-    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
+    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/dev/auto-updater-dev.lua",
             function(result, headers, status_code)
                 local function parse_auto_update_result(result, headers, status_code)
                     local error_prefix = "Error downloading auto-updater: "
                     if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
                     if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
                     filesystem.mkdir(filesystem.scripts_dir() .. "lib")
-                    local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+                    local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater-dev.lua", "wb")
                     if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
                     file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
                 end
@@ -35,9 +34,9 @@ if not status then
             end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
     async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 40) do util.yield(250) i = i + 1 end
     if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
-    auto_updater = require("auto-updater")
+    auto_updater = require("auto-updater-dev")
 end
-if auto_updater == true then error("Invalid auto-updater lib. Please delete your Stand/Lua Scripts/lib/auto-updater.lua and try again") end
+if auto_updater == true then error("Invalid auto-updater lib. Please delete your Stand/Lua Scripts/lib/auto-updater-dev.lua and try again") end
 
 ---
 --- Auto-Update
@@ -459,6 +458,28 @@ end
 
 local function announce_message(message)
     chat.send_message(replace_command_character(message), false, true, true)
+end
+
+---
+--- Request Control
+---
+
+local function request_control_once(entity)
+    if not NETWORK.NETWORK_IS_IN_SESSION() then
+        return true
+    end
+    local netId = NETWORK.NETWORK_GET_NETWORK_ID_FROM_ENTITY(entity)
+    NETWORK.SET_NETWORK_ID_CAN_MIGRATE(netId, true)
+    return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
+end
+
+local function request_control(entity, timeout)
+    if not ENTITY.DOES_ENTITY_EXIST(entity) then
+        return false
+    end
+    local end_time = util.current_time_millis() + (timeout or 500)
+    repeat util.yield_once() until request_control_once(entity) or util.current_time_millis() >= end_time
+    return request_control_once(entity)
 end
 
 ---
@@ -1871,6 +1892,53 @@ add_chat_command{
 --    end
 --}
 
+add_chat_command{
+    command="pinkify",
+    help="Sets vehicle to Agnetha style",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
+            VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 255, 145, 164)
+            VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 255, 145, 164)
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
+            VEHICLE.SET_VEHICLE_XENON_LIGHT_COLOR_INDEX(vehicle, 9)
+            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, -1, 136)
+            VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(vehicle, 255, 192, 203)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 0, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 1, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 2, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 3, true)
+            VEHICLE.SET_VEHICLE_NEON_COLOUR(vehicle, 255, 50, 100)
+            VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, 8)
+            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 116)
+            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 116)
+            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 136)
+            vehicle_set_plate(vehicle, "Agnetha")
+        end
+    end
+}
+
+
+
+local pop_multiplier_id
+add_chat_command{
+    command="traffic",
+    help="Sets traffic on or off for the entire lobby",
+    func=function(pid, commands)
+        local enabled_string = get_on_off_string(commands[2])
+        local enabled = (enabled_string == "ON")
+        if not enabled then
+            pop_multiplier_id = MISC.ADD_POP_MULTIPLIER_SPHERE(1.1, 1.1, 1.1, 15000.0, 0.0, 0.0, false, true)
+            MISC.CLEAR_AREA(1.1, 1.1, 1.1, 19999.9, true, false, false, true)
+            help_message(pid, "Traffic off for lobby")
+        else
+            MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
+            help_message(pid, "Traffic on for lobby")
+        end
+    end
+}
+
 -- Self Commands
 
 add_chat_command{
@@ -1881,34 +1949,25 @@ add_chat_command{
     end
 }
 
---add_chat_command{
---    command="tp",
---    help="Teleport to your waypoint.",
---    func=function(pid, commands)
---        -- Copied from ACJokerScript
---        local x, y, z, b = players.get_waypoint(pid)
---        if x == 0.0 and y == 0.0 then
---            help_message("You must set a waypoint to teleport to")
---        else
---            if HUD.IS_WAYPOINT_ACTIVE() then
---                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
---                HUD.SET_WAYPOINT_OFF()
---                HUD.SET_NEW_WAYPOINT(x, y)
---                if pid == players.user() then
---                    menu.trigger_commands("tpwp")
---                else
---                    menu.trigger_commands("WPTP".. players.get_name(pid))
---                end
---                util.yield(1500)
---                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
---            else
---                HUD.SET_NEW_WAYPOINT(x, y)
---                menu.trigger_commands("WPTP".. players.get_name(pid))
---                HUD.SET_WAYPOINT_OFF()
---            end
---        end
---    end
---}
+add_chat_command{
+    command="tp",
+    help="Teleport to your waypoint.",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle == 0 then
+            help_message(pid, "You must be inside a vehicle to teleport")
+            return
+        end
+        local x, y, z, b = players.get_waypoint(pid)
+        if x == 0.0 and y == 0.0 then
+            help_message("You must set a waypoint to teleport to")
+        else
+            request_control(vehicle)
+            ENTITY.SET_ENTITY_COORDS(vehicle, x, y, z)
+            VEHICLE.SET_VEHICLE_ON_GROUND_PROPERLY(vehicle, 5)
+        end
+    end
+}
 
 add_chat_command{
     command="unstick",
@@ -1924,6 +1983,32 @@ add_chat_command{
     help="Get all possible weapons",
     func=function(pid, commands)
         menu.trigger_commands("arm " .. players.get_name(pid))
+    end
+}
+
+add_chat_command{
+    command="setrank",
+    help="Get all possible weapons",
+    func=function(pid, commands)
+        local rank_number = tonumber(commands[2])
+        if rank_number then
+            menu.trigger_commands("psetrank " .. players.get_name(pid).." "..rank_number)
+            help_message(pid, "Setting rank to "..rank_number..". You will need to change sessions for changes to take effect.")
+        end
+    end
+}
+
+add_chat_command{
+    command="fastrun",
+    help="Run faster",
+    func=function(pid, commands)
+        local enabled_string = get_on_off_string((commands and commands[2]) or "on")
+        if enabled_string then
+            menu.trigger_commands("givefastrun " .. players.get_name(pid))
+        else
+            menu.trigger_commands("removefastrun " .. players.get_name(pid))
+        end
+        help_message(pid, "Fast run " .. enabled_string ..". You will need to change sessions for changes to take effect.")
     end
 }
 
@@ -2362,4 +2447,3 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 ---
 
 util.create_tick_handler(afk_mode_tick)
-util.set_busy(false)
