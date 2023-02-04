@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.14b13"
+local SCRIPT_VERSION = "0.14b14"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1302,7 +1302,7 @@ add_chat_command{
     func=function(pid, commands)
         -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
-            -1643482755,
+            -1367443755,
             players.user(),
             4,
             10000, -- wage?
@@ -1919,8 +1919,6 @@ add_chat_command{
     end
 }
 
-
-
 local pop_multiplier_id
 add_chat_command{
     command="traffic",
@@ -1948,6 +1946,35 @@ add_chat_command{
         menu.trigger_commands("aptme " .. players.get_name(pid))
     end
 }
+
+--add_chat_command{
+--    command="tp",
+--    help="Teleport to your waypoint.",
+--    func=function(pid, commands)
+--        -- Copied from ACJokerScript
+--        local x, y, z, b = players.get_waypoint(pid)
+--        if x == 0.0 and y == 0.0 then
+--            help_message("You must set a waypoint to teleport to")
+--        else
+--            if HUD.IS_WAYPOINT_ACTIVE() then
+--                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
+--                HUD.SET_WAYPOINT_OFF()
+--                HUD.SET_NEW_WAYPOINT(x, y)
+--                if pid == players.user() then
+--                    menu.trigger_commands("tpwp")
+--                else
+--                    menu.trigger_commands("WPTP".. players.get_name(pid))
+--                end
+--                util.yield(1500)
+--                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
+--            else
+--                HUD.SET_NEW_WAYPOINT(x, y)
+--                menu.trigger_commands("WPTP".. players.get_name(pid))
+--                HUD.SET_WAYPOINT_OFF()
+--            end
+--        end
+--    end
+--}
 
 add_chat_command{
     command="tp",
@@ -1983,32 +2010,6 @@ add_chat_command{
     help="Get all possible weapons",
     func=function(pid, commands)
         menu.trigger_commands("arm " .. players.get_name(pid))
-    end
-}
-
-add_chat_command{
-    command="setrank",
-    help="Get all possible weapons",
-    func=function(pid, commands)
-        local rank_number = tonumber(commands[2])
-        if rank_number then
-            menu.trigger_commands("psetrank " .. players.get_name(pid).." "..rank_number)
-            help_message(pid, "Setting rank to "..rank_number..". You will need to change sessions for changes to take effect.")
-        end
-    end
-}
-
-add_chat_command{
-    command="fastrun",
-    help="Run faster",
-    func=function(pid, commands)
-        local enabled_string = get_on_off_string((commands and commands[2]) or "on")
-        if enabled_string then
-            menu.trigger_commands("givefastrun " .. players.get_name(pid))
-        else
-            menu.trigger_commands("removefastrun " .. players.get_name(pid))
-        end
-        help_message(pid, "Fast run " .. enabled_string ..". You will need to change sessions for changes to take effect.")
     end
 }
 
