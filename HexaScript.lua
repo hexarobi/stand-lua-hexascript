@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b3"
+local SCRIPT_VERSION = "0.16b4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -127,104 +127,44 @@ local config = {
     afk_mode_in_casino = true,
     chat_control_character = "!",
     chat_control_character_index = 1,
-    num_allowed_spawned_vehicles_per_player = 2,
+    num_allowed_spawned_vehicles_per_player = 1,
     auto_spectate_far_away_players = true,
-    lobby_mode_index = 2,
-    tick_handler_delay = 60000,
+    lobby_mode_index = 1,
+    tick_handler_delay = 15000,
+    delete_old_vehicles_tick_handler_delay = 1000,
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
     fresh_lobby_delay = 600000,
-    delay_between_bulk_invites = 1500000,
     min_num_players = 3,
     user_max_commands_per_time = 3,
     user_command_time = 30000,
     large_vehicles = {
         "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol",
+    },
+    teleport_map = {
+        mckenzie={2137.5266, 4799.469, 40.61362},
+        sandy={1756.956, 3270.2417, 40.565292},
+        chiliad={497.87296, 5594.12, 794.66626},
+        casino={922.69604, 47.10072, 81.10637},
+        maze={-75.15735, -818.50104, 326.1752},
+        zancudo={-2285.87, 3124.1968, 32.81467},
+        airport={-1087.7434, -3015.6057, 13.940606},
+        paleto={-303.0619, 6247.989, 31.432796},
+        pier={-1716.3751, -1090.788, 13.085348},
+        beach={-1938.2361, -745.7929, 3.0065336},
+        west={-1378.9878, -537.43, 30.134169},
+        east={760.28656, -789.80023, 26.399529},
+        vinewood={226.5897, 209.1123, 105.52663},
+    },
+    teleport_aliases = {
+        sandyshores="sandy",
+        dirtairport="dirtairport",
+        lsia="airport",
     }
 }
 
 local state = {}
 local menus = {}
-
-local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
-filesystem.mkdirs(CONFIG_DIR)
-local FRIENDS_LIST_FILE = CONFIG_DIR .. "friends_list.json"
-
-local function save_friends(friends_list)
-    local file = io.open(FRIENDS_LIST_FILE, "wb")
-    if file == nil then util.toast("Error opening friends list file for writing: "..FRIENDS_LIST_FILE, TOAST_ALL) return end
-    file:write(soup.json.encode(friends_list))
-    file:close()
-end
-
-local function load_friends()
-    local file = io.open(FRIENDS_LIST_FILE)
-    if file then
-        local version = file:read()
-        file:close()
-        local load_friends_status, friends_list = pcall(soup.json.decode, version)
-        if not load_friends_status then
-            error("Could not decode friends list file")
-        end
-        return friends_list
-    else
-        return {}
-    end
-end
-
-local function add_friend(pid)
-    local new_friend = {
-        pid=pid,
-        name=players.get_name(pid),
-        rockstar_id=players.get_rockstar_id(pid),
-        rockstar_id_2=players.get_rockstar_id_2(pid),
-        added_at=util.current_time_millis(),
-    }
-    local friends_list = load_friends()
-    for _, friend in pairs(friends_list) do
-        if friend.rockstar_id == new_friend.rockstar_id then
-            return true
-        end
-    end
-    table.insert(friends_list, new_friend)
-    save_friends(friends_list)
-    return true
-end
-
-local function remove_friend(pid)
-    local rockstar_id = players.get_rockstar_id(pid)
-    local friends_list = load_friends()
-    for index, friend in pairs(friends_list) do
-        if friend.rockstar_id == rockstar_id then
-            friends_list[index] = nil
-            save_friends(friends_list)
-            return true
-        end
-    end
-    return false
-end
-
-local function is_friend_in_lobby(current_lobby_rockstar_ids, friend)
-    for _, rockstar_id in current_lobby_rockstar_ids do
-        if friend.rockstar_id == rockstar_id then
-            return true
-        end
-    end
-    return false
-end
-
---local function invite_friends_to_lobby()
---    local current_lobby_rockstar_ids = {}
---    for _, player_id in pairs(players.list()) do
---        table.insert(current_lobby_rockstar_ids, players.get_rockstar_id(player_id))
---    end
---    local friends_list = load_friends()
---    for _, friend in pairs(friends_list) do
---        if not is_friend_in_lobby(current_lobby_rockstar_ids, friend) then
---            menu.trigger_commands("ridinvite "..friend.rockstar_id)
---        end
---    end
---end
 
 local lobby_modes = {
     { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
@@ -367,25 +307,38 @@ local passthrough_commands = {
     },
     "sprunkify",
     "sprunkrain",
-    "spawnfor",
-    "ecola",
---    {
---        command="casinojoin",
---        outbound_command="casinojoin",
---        requires_player_name=true,
---    },
+    --"spawnfor",
+    --"ecola",
     {
         command="casinotp",
         outbound_command="casinotp",
         requires_player_name=true,
     },
-    --{
-    --    command="animal",
-    --    help="Turns into a random animal",
-    --    outbound_command="furry",
-    --    requires_player_name=true,
-    --},
 }
+
+---
+--- Utils
+---
+
+-- From https://stackoverflow.com/questions/12394841/safely-remove-items-from-an-array-table-while-iterating
+local function array_remove(t, fnKeep)
+    local j, n = 1, #t;
+
+    for i=1,n do
+        if (fnKeep(t, i, j)) then
+            -- Move i's kept value to j's position, if it's not already there.
+            if (i ~= j) then
+                t[j] = t[i];
+                t[i] = nil;
+            end
+            j = j + 1; -- Increment position of where we'll place the next kept value.
+        else
+            t[i] = nil;
+        end
+    end
+
+    return t;
+end
 
 ---
 --- Constructor Spawnable Constructs Passthrough Commands
@@ -463,6 +416,21 @@ local function is_in_list(needle, list)
         end
     end
     return false
+end
+
+local function array_reverse(x)
+    local n, m = #x, #x/2
+    for i=1, m do
+        x[i], x[n-i+1] = x[n-i+1], x[i]
+    end
+    return x
+end
+
+local function load_hash(hash)
+    STREAMING.REQUEST_MODEL(hash)
+    while not STREAMING.HAS_MODEL_LOADED(hash) do
+        util.yield()
+    end
 end
 
 ---
@@ -548,12 +516,9 @@ local function is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name)
     return true
 end
 
-local function load_hash(hash)
-    STREAMING.REQUEST_MODEL(hash)
-    while not STREAMING.HAS_MODEL_LOADED(hash) do
-        util.yield()
-    end
-end
+---
+--- Player Spawned Vehicles
+---
 
 local players_spawned_vehicles = {}
 
@@ -568,11 +533,37 @@ local function get_player_spawned_vehicles(pid)
     return new_player_spawned_vehicles
 end
 
+local next_delete_old_vehicles_tick_time = util.current_time_millis() + config.delete_old_vehicles_tick_handler_delay
+local function delete_old_vehicles_tick()
+    if util.current_time_millis() > next_delete_old_vehicles_tick_time then
+        next_delete_old_vehicles_tick_time = util.current_time_millis() + config.delete_old_vehicles_tick_handler_delay
+        for _, player_spawned_vehicles in pairs(players_spawned_vehicles) do
+            array_remove(player_spawned_vehicles.vehicles, function(t, i)
+                local player_spawned_vehicle = t[i]
+                if player_spawned_vehicle.is_deletable then
+                    if player_spawned_vehicle.delete_counter == nil then player_spawned_vehicle.delete_counter = 0 end
+                    if ENTITY.DOES_ENTITY_EXIST(player_spawned_vehicle.handle) then
+                        entities.delete_by_handle(player_spawned_vehicle.handle)
+                        player_spawned_vehicle.delete_counter = 0
+                    else
+                        player_spawned_vehicle.delete_counter = player_spawned_vehicle.delete_counter + 1
+                    end
+                    if player_spawned_vehicle.delete_counter > 5 then
+                        return false
+                    end
+                end
+                return true
+            end)
+        end
+    end
+end
+
 local function despawn_for_player(pid)
     local player_spawned_vehicles = get_player_spawned_vehicles(pid)
-    if #player_spawned_vehicles.vehicles >= config.num_allowed_spawned_vehicles_per_player then
-        entities.delete_by_handle(player_spawned_vehicles.vehicles[1].handle)
-        table.remove(player_spawned_vehicles.vehicles, 1)
+    for index, player_spawned_vehicle in ipairs(array_reverse(player_spawned_vehicles.vehicles)) do
+        if index >= config.num_allowed_spawned_vehicles_per_player then
+            player_spawned_vehicle.is_deletable = true
+        end
     end
 end
 
@@ -596,6 +587,10 @@ local function spawn_vehicle_for_player(model_name, pid, offset)
         return vehicle
     end
 end
+
+---
+--- Vehicle Mods
+---
 
 local function does_vehicle_have_invalid_mods(vehicle)
     local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle))
@@ -640,6 +635,10 @@ local function min_mods(vehicle)
         VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, x, false)
     end
 end
+
+---
+--- Clean Up
+---
 
 local function get_player_vehicle_handles()
     local player_vehicle_handles = {}
@@ -687,26 +686,26 @@ local function delete_entities_by_range(my_entities, range, type, pid)
     return count
 end
 
-local function delete_nearby_invis_vehicles(pid)
-    local player_vehicle_handles = get_player_vehicle_handles()
-    local player_pos = ENTITY.GET_ENTITY_COORDS(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), 1)
-    local range = 500
-    local count = 0
-    for _, entity in ipairs(entities.get_all_vehicles_as_handles()) do
-        local entity_pos = ENTITY.GET_ENTITY_COORDS(entity, 1)
-        local dist = SYSTEM.VDIST(player_pos.x, player_pos.y, player_pos.z, entity_pos.x, entity_pos.y, entity_pos.z)
-        if dist <= range then
-            if not is_entity_occupied(entity, "VEHICLE", player_vehicle_handles) then
-                if not VEHICLE.IS_VEHICLE_VISIBLE(entity) then
-                    util.toast("Deleting invis vehicle")
-                    entities.delete_by_handle(entity)
-                    count = count + 1
-                end
-            end
-        end
-    end
-    return count
-end
+--local function delete_nearby_invis_vehicles(pid)
+--    local player_vehicle_handles = get_player_vehicle_handles()
+--    local player_pos = ENTITY.GET_ENTITY_COORDS(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), 1)
+--    local range = 500
+--    local count = 0
+--    for _, entity in ipairs(entities.get_all_vehicles_as_handles()) do
+--        local entity_pos = ENTITY.GET_ENTITY_COORDS(entity, 1)
+--        local dist = SYSTEM.VDIST(player_pos.x, player_pos.y, player_pos.z, entity_pos.x, entity_pos.y, entity_pos.z)
+--        if dist <= range then
+--            if not is_entity_occupied(entity, "VEHICLE", player_vehicle_handles) then
+--                if not VEHICLE.IS_VEHICLE_VISIBLE(entity) then
+--                    util.toast("Deleting invis vehicle")
+--                    entities.delete_by_handle(entity)
+--                    count = count + 1
+--                end
+--            end
+--        end
+--    end
+--    return count
+--end
 
 ---
 --- Commands
@@ -1002,7 +1001,7 @@ local function get_player_vehicle_in_control(pid, opts)
     if opts and opts.near_only and vehicle == 0 then
         return 0
     end
-    if vehicle == 0 and target_ped ~= my_ped and dist > 340000 and not was_spectating then
+    if vehicle == 0 and target_ped ~= my_ped and dist > 740000 and not was_spectating then
         if not config.auto_spectate_far_away_players then
             help_message(pid, "Sorry, you are too far away right now, please try again later")
             return
@@ -1065,6 +1064,7 @@ end
 local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
     if vehicle_model_name == nil or vehicle_model_name == "" then
         vehicle_model_name = vehicles_list[math.random(#vehicles_list)]
+        --help_message(pid, "Spawning "..vehicle_model_name)
     end
     vehicle_model_name = apply_vehicle_model_name_shortcuts(vehicle_model_name)
     if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
@@ -1078,6 +1078,12 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
             return false
         end
     end
+end
+
+local function teleport_vehicle_to_coords(vehicle, x, y, z)
+    request_control(vehicle)
+    ENTITY.SET_ENTITY_COORDS(vehicle, x, y, z)
+    VEHICLE.SET_VEHICLE_ON_GROUND_PROPERLY(vehicle, 5)
 end
 
 --local function gift_vehicle_to_player(pid)
@@ -1940,34 +1946,27 @@ add_chat_command{
     end
 }
 
---add_chat_command{
---    command="tp",
---    help="Teleport to your waypoint.",
---    func=function(pid, commands)
---        -- Copied from ACJokerScript
---        local x, y, z, b = players.get_waypoint(pid)
---        if x == 0.0 and y == 0.0 then
---            help_message("You must set a waypoint to teleport to")
---        else
---            if HUD.IS_WAYPOINT_ACTIVE() then
---                local curway = HUD.GET_BLIP_INFO_ID_COORD(HUD.GET_FIRST_BLIP_INFO_ID(8))
---                HUD.SET_WAYPOINT_OFF()
---                HUD.SET_NEW_WAYPOINT(x, y)
---                if pid == players.user() then
---                    menu.trigger_commands("tpwp")
---                else
---                    menu.trigger_commands("WPTP".. players.get_name(pid))
---                end
---                util.yield(1500)
---                HUD.SET_NEW_WAYPOINT(curway.x, curway.y)
---            else
---                HUD.SET_NEW_WAYPOINT(x, y)
---                menu.trigger_commands("WPTP".. players.get_name(pid))
---                HUD.SET_WAYPOINT_OFF()
---            end
---        end
---    end
---}
+add_chat_command{
+    command="gravity",
+    help="Set your vehicles gravity multiplier.",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle == 0 then
+            help_message(pid, "You must be inside a vehicle to set gravity multiplier")
+            return
+        end
+
+        local gravity_value = tonumber(commands[2])
+        local max_gravity = 50
+        local neg_gravity = (0 - max_gravity)
+        if gravity_value < neg_gravity then gravity_value = neg_gravity end
+        if gravity_value > max_gravity then gravity_value = max_gravity end
+        --entities.set_gravity(entities.handle_to_pointer(vehicle), gravity_value)
+        entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), gravity_value)
+        help_message(pid, "Gravity multiplier set to "..gravity_value)
+
+    end
+}
 
 add_chat_command{
     command="tp",
@@ -1978,13 +1977,24 @@ add_chat_command{
             help_message(pid, "You must be inside a vehicle to teleport")
             return
         end
-        local x, y, z, b = players.get_waypoint(pid)
-        if x == 0.0 and y == 0.0 then
-            help_message("You must set a waypoint to teleport to")
+        local teleport_coords
+        if commands[2] == nil then
+            local x, y, z, b = players.get_waypoint(pid)
+            if (x == 0.0 and y == 0.0) then
+                help_message("You must set a waypoint to teleport to, or name a location")
+            end
+            teleport_coords = {x, y, z}
         else
-            request_control(vehicle)
-            ENTITY.SET_ENTITY_COORDS(vehicle, x, y, z)
-            VEHICLE.SET_VEHICLE_ON_GROUND_PROPERLY(vehicle, 5)
+            local location = commands[2]
+            if config.teleport_aliases[location] ~= nil then location = config.teleport_aliases[location] end
+            if config.teleport_map[location] ~= nil then
+                teleport_coords = config.teleport_map[location]
+            else
+                help_message("Unknown location")
+            end
+        end
+        if teleport_coords ~= nil then
+            teleport_vehicle_to_coords(vehicle, teleport_coords[1], teleport_coords[2], teleport_coords[3])
         end
     end
 }
@@ -2044,26 +2054,6 @@ add_chat_command{
     end
 }
 
---add_chat_command{
---    command="friend",
---    help="Add to friend list for future lobby invites",
---    func=function(pid, commands)
---        if add_friend(pid) then
---            help_message(pid, "You have been added to the friends list and will get lobby invites when available.")
---        end
---    end
---}
-
---add_chat_command{
---    command="unfriend",
---    help="Remove from friend list for future lobby invites",
---    func=function(pid, commands)
---        if remove_friend(pid) then
---            help_message(pid, "You have been removed from the friends list and will no longer get lobby invites.")
---        end
---    end
---}
-
 local function is_player_special(pid)
     for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyT", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
         if players.get_name(pid) == player_name then
@@ -2082,24 +2072,6 @@ add_chat_command{
         end
     end
 }
-
---add_chat_command{
---    command="animal",
---    help="Turn into a random animal",
---    func=function(pid, commands)
---        local toggled = true
---        while toggled do
---            local player = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
---            -- From JinxScript
---            if PED.IS_PED_MODEL(player, 0x9C9EFFD8) or PED.IS_PED_MODEL(player, 0x705E61F2) then
---                util.trigger_script_event(1 << pid, {-1178972880, pid, 8, -1, 1, 1, 1})
---            else
---                toggled = false
---            end
---            util.yield()
---        end
---    end
---}
 
 -- Money commands
 
@@ -2267,20 +2239,12 @@ end
 ---
 
 local next_tick_time = util.current_time_millis() + config.tick_handler_delay
-local next_bulk_invite_time
 local function afk_casino_tick()
     if not config.afk_mode_in_casino then return end
     if not is_player_in_casino(players.user()) then
         enter_casino()
     else
         force_roulette_area()
-        -- This doesnt seem to work for non-friends :(
-        --if (next_bulk_invite_time == nil) or (next_bulk_invite_time < util.current_time_millis()) then
-        --    util.toast("Bulk inviting "..tostring(next_bulk_invite_time).." > "..util.current_time_millis(), TOAST_ALL)
-        --    bulk_invite()
-        --    next_bulk_invite_time = (util.current_time_millis() + config.delay_between_bulk_invites)
-        --    util.toast("Next invite time "..next_bulk_invite_time, TOAST_ALL)
-        --end
     end
 end
 
@@ -2331,6 +2295,25 @@ local function afk_mode_tick()
     end
     return true
 end
+
+local builtin_chat_commands_paths = {
+    "Online>Chat>Commands>For Strangers>Enabled",
+    "Online>Chat>Commands>For Team Chat>Enabled",
+    "Online>Chat>Commands>For Crew Members>Enabled",
+    "Online>Chat>Commands>For Friends>Enabled",
+    "Online>Chat>Commands>Enabled For Me",
+}
+
+local function disable_builtin_chat_commands()
+    for _, builtin_chat_commands_path in pairs(builtin_chat_commands_paths) do
+        local command_ref = menu.ref_by_path(builtin_chat_commands_path)
+        if command_ref.value then
+            util.toast("Disabling built-in chat command option: "..builtin_chat_commands_path, TOAST_ALL)
+            command_ref.value = false
+        end
+    end
+end
+disable_builtin_chat_commands()
 
 ---
 --- Root Menu
@@ -2435,3 +2418,4 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 ---
 
 util.create_tick_handler(afk_mode_tick)
+util.create_tick_handler(delete_old_vehicles_tick)
