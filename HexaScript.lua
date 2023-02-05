@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b2"
+local SCRIPT_VERSION = "0.16b3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -2205,7 +2205,7 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat)
     if string.starts(message_text, chat_control_character) then
         local commands = strsplit(message_text:lower():sub(2))
         for _, chat_command in ipairs(chat_commands) do
-            if commands[1] == chat_command.command:lower() and chat_command.func then
+            if chat_command.is_enabled and commands[1] == chat_command.command:lower() and chat_command.func then
                 if is_user_allowed_to_issue_chat_command(pid, commands) then
                     chat_command.func(pid, commands, chat_command)
                 end
@@ -2259,28 +2259,6 @@ local function force_org()
         menu.trigger_commands("ceostart")
     elseif org_type == 1 then
         menu.trigger_commands("mctoceo")
-    end
-end
-
----
---- Bulk Invite
----
-
-local function array_reverse(x)
-    local n, m = #x, #x/2
-    for i=1, m do
-        x[i], x[n-i+1] = x[n-i+1], x[i]
-    end
-    return x
-end
-
-local function bulk_invite()
-    if PLAYER.GET_NUMBER_OF_PLAYERS() < 20 then
-        for _, friend in pairs(array_reverse(load_friends())) do
-            util.toast("Inviting "..friend.name)
-            menu.trigger_commands("ridinvite "..friend.rockstar_id)
-            util.yield(500)
-        end
     end
 end
 
@@ -2367,19 +2345,22 @@ for _, chat_command in pairs(chat_commands) do
     if type(chat_command) ~= "table" then
         util.toast("Invalid chat command "..inspect(chat_command), TOAST_ALL)
     else
-        menu.action(
-                chat_commands_menu_list,
-                chat_command.command,
-                {chat_command.override_action_command or chat_command.command},
-                get_menu_action_help(chat_command),
-                function(click_type, pid)
-                    if chat_command.func ~= nil then
-                        return chat_command.func(pid, {chat_command.command}, chat_command)
-                    else
-                        return help_message(pid, chat_command.help)
-                    end
-                end
-        )
+        local menu_list = menu.list(chat_commands_menu_list, chat_command.command)
+        menu.divider(menu_list, chat_command.command)
+        menu.action(menu_list, "Run", {chat_command.override_action_command or chat_command.command}, get_menu_action_help(chat_command), function(click_type, pid)
+            if chat_command.func ~= nil then
+                return chat_command.func(pid, {chat_command.command}, chat_command)
+            end
+        end)
+        menu.action(menu_list, "Help", {}, get_menu_action_help(chat_command), function(click_type, pid)
+            if chat_command.help ~= nil then
+                return help_message(pid, chat_command.help)
+            end
+        end)
+        if chat_command.is_enabled == nil then chat_command.is_enabled = true end
+        menu.toggle(menu_list, "Enabled", {}, "Is this command currently active and usable by other players", function(toggle)
+            chat_command.is_enabled = toggle
+        end, chat_command.is_enabled)
     end
 end
 
@@ -2391,28 +2372,6 @@ end)
 menu.action(menus.announcements, "Casino Rigged", {}, "Announce casino rigged", function()
     announce_casino_rigged()
 end)
-
---local friends_menus = {}
---local friends_menu
---friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
---    for _, friend_menu in pairs(friends_menus) do
---        if friend_menu:isValid() then
---            menu.delete(friend_menu)
---        end
---    end
---    for _, friend in pairs(load_friends()) do
---        local friend_menu = menu.list(friends_menu, friend.name)
---        menu.action(friend_menu, "Invite", {}, "", function()
---            menu.trigger_commands("ridinvite "..friend.rockstar_id)
---        end)
---        table.insert(friends_menus, friend_menu)
---    end
---end)
---
---menu.action(menu.my_root(), "Bulk Invite", {}, "", function()
---    bulk_invite()
---end)
-
 
 ---
 --- Options Menu
