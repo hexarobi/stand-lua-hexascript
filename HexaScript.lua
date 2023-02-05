@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b1"
+local SCRIPT_VERSION = "0.16b2"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -137,8 +137,14 @@ local config = {
     delay_between_bulk_invites = 1500000,
     min_num_players = 3,
     user_max_commands_per_time = 3,
-    user_command_time = 30000
+    user_command_time = 30000,
+    large_vehicles = {
+        "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol",
+    }
 }
+
+local state = {}
+local menus = {}
 
 local CONFIG_DIR = filesystem.store_dir() .. 'Hexascript\\'
 filesystem.mkdirs(CONFIG_DIR)
@@ -352,16 +358,6 @@ local vehicles_with_invalid_mods = {
     "issi8",
 }
 
-local VEHICLE_BLOCK_FRIENDLY_SPAWNS = {
-    kosatka = 1,
-    jet = 2,
-    cargoplane = 3,
-    tug = 4,
-    cargoplane2 = 5,
-    alkonost = 6,
-    --titan = 5,
-    --volatol = 6,
-}
 local passthrough_commands = {
     {
         command="sprunk",
@@ -460,6 +456,15 @@ local function announce_message(message)
     chat.send_message(replace_command_character(message), false, true, true)
 end
 
+local function is_in_list(needle, list)
+    for _, item in pairs(list) do
+        if item == needle then
+            return true
+        end
+    end
+    return false
+end
+
 ---
 --- Request Control
 ---
@@ -529,24 +534,12 @@ local function is_player_in_casino(pid)
     }, pid)
 end
 
-
---local function is_player_in_casino(pid)
---    local player_pos = players.get_position(pid)
---    -- Casino pos 1100.000, 220.000, -50.000
---    if player_pos.x > 900 and player_pos.x < 1300
---        and player_pos.y > 0 and player_pos.y < 500
---        and player_pos.z > -100 and player_pos.z < 0 then
---        return true
---    end
---    return false
---end
-
 local function is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name)
     local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
     if target_ped == players.user_ped() then   -- The user can spawn anything anywhere
         return true
     end
-    if VEHICLE_BLOCK_FRIENDLY_SPAWNS[vehicle_model_name] ~= nil then    -- Block large vehicles from friendly spawns
+    if is_in_list(vehicle_model_name, config.large_vehicles) and state.allowed_large_vehicles[vehicle_model_name] ~= true then
         return false
     end
     if is_player_in_casino(pid) then
@@ -2051,25 +2044,25 @@ add_chat_command{
     end
 }
 
-add_chat_command{
-    command="friend",
-    help="Add to friend list for future lobby invites",
-    func=function(pid, commands)
-        if add_friend(pid) then
-            help_message(pid, "You have been added to the friends list and will get lobby invites when available.")
-        end
-    end
-}
+--add_chat_command{
+--    command="friend",
+--    help="Add to friend list for future lobby invites",
+--    func=function(pid, commands)
+--        if add_friend(pid) then
+--            help_message(pid, "You have been added to the friends list and will get lobby invites when available.")
+--        end
+--    end
+--}
 
-add_chat_command{
-    command="unfriend",
-    help="Remove from friend list for future lobby invites",
-    func=function(pid, commands)
-        if remove_friend(pid) then
-            help_message(pid, "You have been removed from the friends list and will no longer get lobby invites.")
-        end
-    end
-}
+--add_chat_command{
+--    command="unfriend",
+--    help="Remove from friend list for future lobby invites",
+--    func=function(pid, commands)
+--        if remove_friend(pid) then
+--            help_message(pid, "You have been removed from the friends list and will no longer get lobby invites.")
+--        end
+--    end
+--}
 
 local function is_player_special(pid)
     for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyT", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
@@ -2251,12 +2244,21 @@ local function enter_casino()
     menu.trigger_commands("casinotp " .. players.get_name(players.user()))
 end
 
-local function force_org()
+local function force_mc()
     local org_type = players.get_org_type(players.user())
     if org_type == -1 then
         menu.trigger_commands("mcstart")
     elseif org_type == 0 then
         menu.trigger_commands("ceotomc")
+    end
+end
+
+local function force_org()
+    local org_type = players.get_org_type(players.user())
+    if org_type == -1 then
+        menu.trigger_commands("ceostart")
+    elseif org_type == 1 then
+        menu.trigger_commands("mctoceo")
     end
 end
 
@@ -2311,10 +2313,20 @@ local function reset_announcement_timer()
 end
 reset_announcement_timer()
 
-local function announce_to_lobby()
+local function announce_chat_commands()
     announce_message("Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help")
-    if config.afk_mode_in_casino and is_player_in_casino(players.user()) then
+end
+
+local function announce_casino_rigged()
+    if is_player_in_casino(players.user()) then
         announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !roulette")
+    end
+end
+
+local function announce_to_lobby()
+    announce_chat_commands()
+    if config.afk_mode_in_casino then
+        announce_casino_rigged()
     end
     reset_announcement_timer()
 end
@@ -2330,7 +2342,7 @@ local function afk_mode_tick()
     if config.afk_mode then
         if util.current_time_millis() > next_tick_time then
             next_tick_time = util.current_time_millis() + config.tick_handler_delay
-            force_org()
+            force_mc()
             if should_find_new_lobby() then
                 find_new_lobby()
             else
@@ -2371,30 +2383,35 @@ for _, chat_command in pairs(chat_commands) do
     end
 end
 
-menu.action(menu.my_root(), "Announce", {}, "", function()
-    announce_to_lobby()
+menus.announcements = menu.list(menu.my_root(), "Announcements")
+
+menu.action(menus.announcements, "Chat Commands", {}, "Announce basic chat commands", function()
+    announce_chat_commands()
+end)
+menu.action(menus.announcements, "Casino Rigged", {}, "Announce casino rigged", function()
+    announce_casino_rigged()
 end)
 
-local friends_menus = {}
-local friends_menu
-friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
-    for _, friend_menu in pairs(friends_menus) do
-        if friend_menu:isValid() then
-            menu.delete(friend_menu)
-        end
-    end
-    for _, friend in pairs(load_friends()) do
-        local friend_menu = menu.list(friends_menu, friend.name)
-        menu.action(friend_menu, "Invite", {}, "", function()
-            menu.trigger_commands("ridinvite "..friend.rockstar_id)
-        end)
-        table.insert(friends_menus, friend_menu)
-    end
-end)
-
-menu.action(menu.my_root(), "Bulk Invite", {}, "", function()
-    bulk_invite()
-end)
+--local friends_menus = {}
+--local friends_menu
+--friends_menu = menu.list(menu.my_root(), "Friends", {}, "", function()
+--    for _, friend_menu in pairs(friends_menus) do
+--        if friend_menu:isValid() then
+--            menu.delete(friend_menu)
+--        end
+--    end
+--    for _, friend in pairs(load_friends()) do
+--        local friend_menu = menu.list(friends_menu, friend.name)
+--        menu.action(friend_menu, "Invite", {}, "", function()
+--            menu.trigger_commands("ridinvite "..friend.rockstar_id)
+--        end)
+--        table.insert(friends_menus, friend_menu)
+--    end
+--end)
+--
+--menu.action(menu.my_root(), "Bulk Invite", {}, "", function()
+--    bulk_invite()
+--end)
 
 
 ---
@@ -2411,6 +2428,14 @@ end, config.auto_spectate_far_away_players)
 menu.slider(menu_options, "Num Spawns Allowed Per Player", {}, "The maximum number of vehicle spawns allowed per player. Once this number is reached, additional spawns will delete the oldest spawned vehicle.", 0, 5, config.num_allowed_spawned_vehicles_per_player, 1, function(value)
     config.num_allowed_spawned_vehicles_per_player = value
 end)
+menus.options_allowed_vehicles = menu.list(menu_options, "Allowed Large Vehicles", {}, "Certain large vehicles are blocked by default to prevent lobby spam, but can be allowed here")
+if state.allowed_large_vehicles == nil then state.allowed_large_vehicles = {} end
+for _, large_vehicle in pairs(config.large_vehicles) do
+    menu.toggle(menus.options_allowed_vehicles, large_vehicle, {}, "", function(toggle)
+        state.allowed_large_vehicles[large_vehicle] = toggle
+    end, state.allowed_large_vehicles[large_vehicle])
+end
+
 menu.list_select(menu_options, "AFK Lobby Type", {}, "When in AFK mode and alone in a lobby, what type of lobby should you switch to.", lobby_modes, config.lobby_mode_index, function(index)
     config.lobby_mode_index = index
 end)
@@ -2420,6 +2445,9 @@ end, config.afk_mode_in_casino)
 menu.slider(menu_options, "Min Players in Lobby", {}, "If in AFK mode, will try to stay in a lobby with at least this many players.", 0, 30, config.min_num_players, 1, function(val)
     config.min_num_players = val
 end, config.min_num_players)
+menu.slider(menu_options, "Announce Delay", {}, "Set the time interval for when announce will be triggered, in minutes", 30, 120, config.announce_delay, 15, function(value)
+    config.announce_delay = value
+end)
 
 ---
 --- Script Meta Menu
