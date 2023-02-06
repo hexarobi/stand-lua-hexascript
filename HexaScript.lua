@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b5"
+local SCRIPT_VERSION = "0.16b6"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -122,6 +122,9 @@ end
 
 local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&", "*"}
 
+local state = {}
+local hexascript = {}
+
 local config = {
     afk_mode = false,
     afk_mode_in_casino = true,
@@ -138,32 +141,60 @@ local config = {
     min_num_players = 3,
     user_max_commands_per_time = 3,
     user_command_time = 30000,
+    announcements = {
+        {
+            name="Basic Commands",
+            messages={"Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help"},
+        },
+        {
+            name="Roulette",
+            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !roulette"},
+            validator=function()
+                return hexascript.is_player_in_casino(players.user())
+            end
+        },
+    },
     large_vehicles = {
         "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol",
     },
     teleport_map = {
-        mckenzie={2137.5266, 4799.469, 40.61362},
-        sandy={1756.956, 3270.2417, 40.565292},
-        chiliad={497.87296, 5594.12, 794.66626},
-        casino={922.69604, 47.10072, 81.10637},
-        maze={-75.15735, -818.50104, 326.1752},
-        zancudo={-2285.87, 3124.1968, 32.81467},
-        airport={-1087.7434, -3015.6057, 13.940606},
-        paleto={-303.0619, 6247.989, 31.432796},
-        pier={-1716.3751, -1090.788, 13.085348},
-        beach={-1938.2361, -745.7929, 3.0065336},
-        west={-1378.9878, -537.43, 30.134169},
-        east={760.28656, -789.80023, 26.399529},
-        vinewood={226.5897, 209.1123, 105.52663},
+        ["8bit"]={ x=-623.96313, y=278.97998, z=81.24377 },
+        airport={ x=-1087.7434, y=-3015.6057, z=13.940606 },
+        arena={ x=-381.53763, y=-1871.6571, z=20.25674 },
+        beach={ x=-1938.2361, y=-745.7929, z=3.0065336 },
+        carmeet={ x=781.38837, y=-1893.78, z=28.879707 },
+        casino={ x=922.69604, y=47.10072, z=81.10637 },
+        chiliad={ x=497.87296, y=5594.12, z=794.66626 },
+        docks={ x=816.03735, y=-2933.1458, z=5.635548 },
+        downtown={ x=19.834902, y=-745.57104, z=43.92299 },
+        east={ x=760.28656, y=-789.80023, z=26.399529 },
+        eclipse={ x=-775.03546, y=297.41296, z=85.46615 },
+        giftgarage={ x=-1078.4542, y=-2229.311, z=12.994034 },
+        golf={ x=-1329.8248, y=-33.513905, z=49.581203 },
+        mckenzie={ x=2137.5266, y=4799.469, z=40.61362 },
+        maze={ x=-75.15735, y=-818.50104, z=326.1752 },
+        paleto={ x=-303.0619, y=6247.989, z=31.432796 },
+        pier={ x=-1716.3751, y=-1090.788, z=13.085348 },
+        rex={ x=2571.9, y=2560.1484, z=34.401012 },
+        sandy={ x=1756.956, y=3270.2417, z=40.565292 },
+        simeons={ x=-73.73742, y=-1123.4886, z=25.499369 },
+        southbeach={ x=-1116.8607, y=-1717.6504, z=4.013644 },
+        strip={ x=118.78938, y=-1313.6859, z=28.91388 },
+        videogeddon={ x=709.92834, y=-831.8337, z=24.115917 },
+        vinewood={ x=226.5897, y=209.1123, z=105.52663 },
+        west={ x=-1378.9878, y=-537.43, z=30.134169 },
+        zancudo={ x=-2285.87, y=3124.1968, z=32.81467 },
     },
     teleport_aliases = {
-        sandyshores="sandy",
-        dirtairport="dirtairport",
+        base="zancudo",
+        dirtairport="sandy",
+        fort="zancudo",
         lsia="airport",
+        sandyshores="sandy",
+        vanilla="strip",
     }
 }
 
-local state = {}
 local menus = {}
 
 local lobby_modes = {
@@ -433,6 +464,17 @@ local function load_hash(hash)
     end
 end
 
+local function get_table_keys(tab)
+    local keyset={}
+    local n=0
+    for k,v in pairs(tab) do
+        n=n+1
+        keyset[n]=k
+    end
+    table.sort(keyset)
+    return keyset
+end
+
 ---
 --- Request Control
 ---
@@ -487,7 +529,7 @@ local function force_roulette_area()
     end
 end
 
-local function is_player_in_casino(pid)
+hexascript.is_player_in_casino = function(pid)
     return is_player_within_dimensions({
         min={
             x=1073.9967,
@@ -510,7 +552,7 @@ local function is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name)
     if is_in_list(vehicle_model_name, config.large_vehicles) and state.allowed_large_vehicles[vehicle_model_name] ~= true then
         return false
     end
-    if is_player_in_casino(pid) then
+    if hexascript.is_player_in_casino(pid) then
         return false
     end
     return true
@@ -1968,6 +2010,14 @@ add_chat_command{
     end
 }
 
+local function find_coords_for_player_name(player_name)
+    for index, player_id in pairs(players.list()) do
+        if PLAYER.GET_PLAYER_NAME(player_id):lower() == player_name:lower() then
+            return ENTITY.GET_ENTITY_COORDS(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(player_id), 1)
+        end
+    end
+end
+
 add_chat_command{
     command="tp",
     help="Teleport to your waypoint.",
@@ -1977,24 +2027,29 @@ add_chat_command{
             help_message(pid, "You must be inside a vehicle to teleport")
             return
         end
+        local command = commands[2]
         local teleport_coords
-        if commands[2] == nil then
+        if command == nil then
             local x, y, z, b = players.get_waypoint(pid)
             if (x == 0.0 and y == 0.0) then
                 help_message("You must set a waypoint to teleport to, or name a location")
             end
             teleport_coords = {x, y, z}
+        elseif command == "list" then
+            help_message(pid, "Valid tp locations: "..table.concat(get_table_keys(config.teleport_map), ", "))
         else
-            local location = commands[2]
-            if config.teleport_aliases[location] ~= nil then location = config.teleport_aliases[location] end
+            local location = command
+            if config.teleport_aliases[location] ~= nil then command = config.teleport_aliases[location] end
             if config.teleport_map[location] ~= nil then
                 teleport_coords = config.teleport_map[location]
             else
-                help_message("Unknown location")
+                teleport_coords = find_coords_for_player_name(command)
             end
         end
-        if teleport_coords ~= nil then
-            teleport_vehicle_to_coords(vehicle, teleport_coords[1], teleport_coords[2], teleport_coords[3])
+        if teleport_coords == nil then
+            help_message(pid, "Unknown teleport location. For a list try !tp list")
+        else
+            teleport_vehicle_to_coords(vehicle, teleport_coords.x, teleport_coords.y, teleport_coords.z)
         end
     end
 }
@@ -2241,7 +2296,7 @@ end
 local next_tick_time = util.current_time_millis() + config.tick_handler_delay
 local function afk_casino_tick()
     if not config.afk_mode_in_casino then return end
-    if not is_player_in_casino(players.user()) then
+    if not hexascript.is_player_in_casino(players.user()) then
         enter_casino()
     else
         force_roulette_area()
@@ -2255,20 +2310,22 @@ local function reset_announcement_timer()
 end
 reset_announcement_timer()
 
-local function announce_chat_commands()
-    announce_message("Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help")
-end
-
-local function announce_casino_rigged()
-    if is_player_in_casino(players.user()) then
-        announce_message("For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !roulette")
+local function announce(announcement)
+    if announcement.validator and type(announcement.validator) == "function" then
+        if not announcement.validator() then
+            util.toast("Skipping invalid announcement: "..announcement.name)
+            return
+        end
+    end
+    announcement.last_announced = util.current_unix_time_seconds()
+    for _, message in pairs(announcement.messages) do
+        announce_message(message)
     end
 end
 
 local function announce_to_lobby()
-    announce_chat_commands()
-    if config.afk_mode_in_casino then
-        announce_casino_rigged()
+    for _, announcement in pairs(config.announcements) do
+        announce(announcement)
     end
     reset_announcement_timer()
 end
@@ -2348,13 +2405,26 @@ for _, chat_command in pairs(chat_commands) do
 end
 
 menus.announcements = menu.list(menu.my_root(), "Announcements")
-
-menu.action(menus.announcements, "Chat Commands", {}, "Announce basic chat commands", function()
-    announce_chat_commands()
-end)
-menu.action(menus.announcements, "Casino Rigged", {}, "Announce casino rigged", function()
-    announce_casino_rigged()
-end)
+for index, announcement in ipairs(config.announcements) do
+    local menu_list = menu.list(menus.announcements, announcement.name, {}, "")
+    for message_index, message in ipairs(announcement.messages) do
+        menu.text_input(menu_list, "Message "..message_index, {"hexascripteditannouncement_"..index.."_"..message_index}, "Edit announcement content", function(value)
+            announcement.messages[message_index] = value
+        end, message)
+    end
+    menu.action(menu_list, "Announce", {}, "Broadcast this announcement to the lobby", function()
+        announce(announcement)
+    end)
+    if announcement.is_enabled == nil then announcement.is_enabled = true end
+    menu.toggle(menu_list, "Enabled", {}, "If enabled, announcement will be repeated everytime the delay expires.", function(toggle)
+        announcement.is_enabled = toggle
+    end, announcement.is_enabled)
+    if announcement.delay == nil then announcement.delay = config.announce_delay end
+    menu.slider(menu_list, "Delay", {}, "Time between repeats of this announcement, in minutes.", 15, 120, announcement.delay, 15, function(value)
+        announcement.delay = value
+    end)
+    menu.readonly(menu_list, "Last Announced", announcement.last_announced or "Never")
+end
 
 ---
 --- Options Menu
