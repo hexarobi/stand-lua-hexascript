@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b6"
+local SCRIPT_VERSION = "0.16b7"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -192,6 +192,7 @@ local config = {
         lsia="airport",
         sandyshores="sandy",
         vanilla="strip",
+        video="videogeddon",
     }
 }
 
@@ -2022,12 +2023,16 @@ add_chat_command{
     command="tp",
     help="Teleport to your waypoint.",
     func=function(pid, commands)
+        local command = commands[2]
+        if command == "list" then
+            help_message(pid, "Teleport locations: "..table.concat(get_table_keys(config.teleport_map), ", "))
+            return
+        end
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle == 0 then
             help_message(pid, "You must be inside a vehicle to teleport")
             return
         end
-        local command = commands[2]
         local teleport_coords
         if command == nil then
             local x, y, z, b = players.get_waypoint(pid)
@@ -2035,8 +2040,6 @@ add_chat_command{
                 help_message("You must set a waypoint to teleport to, or name a location")
             end
             teleport_coords = {x, y, z}
-        elseif command == "list" then
-            help_message(pid, "Valid tp locations: "..table.concat(get_table_keys(config.teleport_map), ", "))
         else
             local location = command
             if config.teleport_aliases[location] ~= nil then command = config.teleport_aliases[location] end
@@ -2051,6 +2054,20 @@ add_chat_command{
         else
             teleport_vehicle_to_coords(vehicle, teleport_coords.x, teleport_coords.y, teleport_coords.z)
         end
+    end
+}
+
+add_chat_command{
+    command="quickboost",
+    help="Set vehicle boost to quick recharge",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle == 0 then
+            help_message(pid, "You must be inside a vehicle to set quick boost")
+            return
+        end
+        VEHICLE.SET_SCRIPT_ROCKET_BOOST_RECHARGE_TIME(vehicle, 0.0)
+        help_message(pid, "Vehicle quick boost enabled")
     end
 }
 
@@ -2105,6 +2122,7 @@ add_chat_command{
     command="ammo",
     help="Add ammo for current weapon",
     func=function(pid, commands)
+        --WEAPON.SET_PED_INFINITE_AMMO(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), true, util.joaat("firework"))
         menu.trigger_commands("ammo" .. players.get_name(pid))
     end
 }
