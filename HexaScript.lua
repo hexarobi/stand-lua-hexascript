@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b7"
+local SCRIPT_VERSION = "0.16b8"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -129,6 +129,9 @@ local config = {
     afk_mode = false,
     afk_mode_in_casino = true,
     chat_control_character = "!",
+    allow_by_default = true,
+    allowed_options = {"Default", "Everyone", "Friends", "Crew", "Org/MC", "Me", "Disabled"},
+    default_allowed_option_index = 2,
     chat_control_character_index = 1,
     num_allowed_spawned_vehicles_per_player = 1,
     auto_spectate_far_away_players = true,
@@ -171,6 +174,7 @@ local config = {
         eclipse={ x=-775.03546, y=297.41296, z=85.46615 },
         giftgarage={ x=-1078.4542, y=-2229.311, z=12.994034 },
         golf={ x=-1329.8248, y=-33.513905, z=49.581203 },
+        luxington={x=3071.25, y=-4729.30, z=15.26},
         mckenzie={ x=2137.5266, y=4799.469, z=40.61362 },
         maze={ x=-75.15735, y=-818.50104, z=326.1752 },
         paleto={ x=-303.0619, y=6247.989, z=31.432796 },
@@ -2039,7 +2043,7 @@ add_chat_command{
             if (x == 0.0 and y == 0.0) then
                 help_message("You must set a waypoint to teleport to, or name a location")
             end
-            teleport_coords = {x, y, z}
+            teleport_coords = {x=x, y=y, z=z}
         else
             local location = command
             if config.teleport_aliases[location] ~= nil then command = config.teleport_aliases[location] end
@@ -2415,6 +2419,9 @@ for _, chat_command in pairs(chat_commands) do
                 return help_message(pid, chat_command.help)
             end
         end)
+        --menu.list_select(menu_list, "Allowed", {}, "", config.allowed_options, chat_command.allowed, function(index)
+        --    chat_command.allowed = index
+        --end)
         if chat_command.is_enabled == nil then chat_command.is_enabled = true end
         menu.toggle(menu_list, "Enabled", {}, "Is this command currently active and usable by other players", function(toggle)
             chat_command.is_enabled = toggle
@@ -2452,6 +2459,9 @@ local menu_options = menu.list(menu.my_root(), "Options")
 menu.list_select(menu_options, "Chat Control Character", {}, "Set the character that chat commands must begin with", control_characters, config.chat_control_character_index, function(index)
     config.chat_control_character_index = index
 end)
+menu.toggle(menu_options, "Allow by Default", {}, "Any commands with the `Default` op.", function(toggle)
+    config.allow_by_default = toggle
+end, config.allow_by_default)
 menu.toggle(menu_options, "Auto-Spectate Far Away Players", {}, "If enabled, you will automatically spectate players who issue commands from far away. Without this far away players will get an error when issuing commands.", function(toggle)
     config.auto_spectate_far_away_players = toggle
 end, config.auto_spectate_far_away_players)
