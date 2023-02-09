@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b8"
+local SCRIPT_VERSION = "0.16b9"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1675,9 +1675,11 @@ add_chat_command{
         if vehicle then
             local side = 0
             if commands[2] == "left" then side = 1 end
-            local state = true
-            if commands[3] == "off" then state = false end
-            VEHICLE.SET_VEHICLE_INDICATOR_LIGHTS(vehicle, side, state)
+
+            local blinker_state = true
+            if commands[3] == "off" then blinker_state = false end
+            VEHICLE.SET_VEHICLE_INDICATOR_LIGHTS(vehicle, side, blinker_state)
+            help_message(pid, "Blinkers set")
         end
     end
 }
@@ -1688,7 +1690,12 @@ add_chat_command{
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
-            vehicle_set_plate(vehicle, commands[2])
+            if commands[2] == nil then
+                help_message(pid, "You must supply some text to set your plate text")
+            else
+                vehicle_set_plate(vehicle, commands[2])
+                help_message(pid, "Vehicle plate set")
+            end
         end
     end
 }
