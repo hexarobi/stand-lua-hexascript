@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b15"
+local SCRIPT_VERSION = "0.16b16"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -158,7 +158,7 @@ local config = {
         },
     },
     large_vehicles = {
-        "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol",
+        "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol", "blimp", "blimp2", "blimp3",
     },
     teleport_map = {
         ["8bit"]={ x=-623.96313, y=278.97998, z=81.24377 },
