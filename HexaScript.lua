@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b13"
+local SCRIPT_VERSION = "0.16b14"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1340,6 +1340,14 @@ add_chat_command{
     },
     func=function(pid, commands, chat_command)
         help_message(pid, chat_command.help)
+    end
+}
+
+add_chat_command{
+    command="carcodes",
+    help="Website with all car spawn codes",
+    func=function(pid, commands)
+        help_message(pid, "For all spawn car codes visit https://gta-objects.xyz/vehicles")
     end
 }
 
