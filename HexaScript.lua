@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b11"
+local SCRIPT_VERSION = "0.16b12"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -2076,6 +2076,39 @@ add_chat_command{
             VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 116)
             VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 136)
             vehicle_set_plate(vehicle, "Agnetha")
+        end
+    end
+}
+
+add_chat_command{
+    command="tegify",
+    help="Sets vehicle to TheEndGame style",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
+            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+            --VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 60, 0, 0)
+            --VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 60, 0, 0)
+            --VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle, 50)
+            VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
+            VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
+            VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 60, 0, 0)
+            VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 0, 0, 0)
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
+            VEHICLE.SET_VEHICLE_XENON_LIGHT_COLOR_INDEX(vehicle, 8)
+            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, -1, 136)
+            VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(vehicle, 255, 0, 0)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 0, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 1, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 2, true)
+            VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 3, true)
+            VEHICLE.SET_VEHICLE_NEON_COLOUR(vehicle, 255, 0, 0)
+            VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, 11)
+            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 26)
+            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 26)
+            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 8)
+            vehicle_set_plate(vehicle, "TEG")
         end
     end
 }
