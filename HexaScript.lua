@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b12"
+local SCRIPT_VERSION = "0.16b13"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1048,6 +1048,9 @@ local function apply_vehicle_model_name_shortcuts(vehicle_model_name)
     if VEHICLE_MODEL_SHORTCUTS[vehicle_model_name] then
         return VEHICLE_MODEL_SHORTCUTS[vehicle_model_name]
     end
+    if constants.spawn_aliases[vehicle_model_name] then
+        return constants.spawn_aliases[vehicle_model_name]
+    end
     return vehicle_model_name
 end
 
@@ -1353,17 +1356,6 @@ add_chat_command{
             gift_vehicle_to_player(pid, vehicle)
         end
     end
-    --func=function(pid, commands)
-    --    local vehicle = get_player_vehicle_in_control(pid)
-    --    if vehicle == 0 then
-    --        help_message(pid, "You must be in a vehicle to use !gift")
-    --    else
-    --        --delete_nearby_invis_vehicles(pid)
-    --        local command_string = "gift " .. players.get_name(pid)
-    --        menu.trigger_commands(command_string)
-    --        help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
-    --    end
-    --end
 }
 
 add_chat_command{
@@ -1387,6 +1379,17 @@ add_chat_command{
         "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
         "If done correctly the vehicle should now be yours. For more tips and troubleshooting try !help gift3"
     },
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle == 0 then
+            help_message(pid, "You must be in a vehicle to use !gift2")
+        else
+            --delete_nearby_invis_vehicles(pid)
+            local command_string = "gift " .. players.get_name(pid)
+            menu.trigger_commands(command_string)
+            help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
+        end
+    end
 }
 
 add_chat_command{
