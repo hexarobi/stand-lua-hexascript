@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b10"
+local SCRIPT_VERSION = "0.16b11"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -1948,20 +1948,37 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="topspeed",
+    command={"topspeed", "ts"},
     help="Sets vehicle top speed",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             local torque_value = 500
             if commands[2] then
-                torque_value = commands[2]
+                torque_value = tonumber(commands[2])
             end
+            if torque_value < 1 then torque_value = 1 end
+            if torque_value > 10000 then torque_value = 10000 end
             if torque_value == nil then torque_value = 500 end
             VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, torque_value)
             ENTITY.SET_ENTITY_MAX_SPEED(vehicle, torque_value)
             --VEHICLE.SET_VEHICLE_CHEAT_POWER_INCREASE(vehicle, torque_value)
             help_message(pid, "Vehicle top speed "..math.floor(torque_value).. '%')
+        end
+    end
+}
+
+add_chat_command{
+    command="engineboost",
+    help="Sets Engine Power",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local value = tonumber(commands[2])
+            if value > 20 then value = 20 end
+            if value < 1 then value = 1 end
+            menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " " ..value)
+            help_message(pid, "Engine power has been set to "..value)
         end
     end
 }
@@ -2356,21 +2373,39 @@ local function is_user_allowed_to_issue_chat_command(pid, commands)
     return true
 end
 
--- Handler for all chat commands
+---
+--- Chat Handler
+---
+
+local function is_command_matched(commands, chat_command)
+    if type(chat_command.command) == "table" then
+        for _, command in pairs(chat_command.command) do
+            if commands[1] == command:lower() then
+                return true
+            end
+        end
+    else
+        if commands[1] == chat_command.command:lower() then
+            return true
+        end
+    end
+    return false
+end
+
 chat.on_message(function(pid, reserved, message_text, is_team_chat)
     local chat_control_character = control_characters[config.chat_control_character_index]
     if string.starts(message_text, chat_control_character) then
         local commands = strsplit(message_text:lower():sub(2))
-        for _, chat_command in ipairs(chat_commands) do
-            if chat_command.is_enabled and commands[1] == chat_command.command:lower() and chat_command.func then
-                if is_user_allowed_to_issue_chat_command(pid, commands) then
+        if is_user_allowed_to_issue_chat_command(pid, commands) then
+            for _, chat_command in ipairs(chat_commands) do
+                if chat_command.is_enabled and is_command_matched(commands, chat_command) and chat_command.func then
                     chat_command.func(pid, commands, chat_command)
+                    return
                 end
-                return
             end
+            -- Default command if no others apply
+            spawn_shuffled_vehicle_for_player(commands[1], pid)
         end
-        -- Default command if no others apply
-        spawn_shuffled_vehicle_for_player(commands[1], pid)
     end
 end)
 
@@ -2510,16 +2545,25 @@ menu.toggle(menu.my_root(), "AFK Mode", {}, "If enabled, you will auto join new 
     config.afk_mode = toggle
 end, config.afk_mode)
 
+local function get_command_name(chat_command)
+    if type(chat_command.command) == "table" then
+        return chat_command.command[1]
+    else
+        return chat_command.command
+    end
+end
+
 local chat_commands_menu_list = menu.list(menu.my_root(), "Chat Commands")
 for _, chat_command in pairs(chat_commands) do
     if type(chat_command) ~= "table" then
         util.toast("Invalid chat command "..inspect(chat_command), TOAST_ALL)
     else
-        local menu_list = menu.list(chat_commands_menu_list, chat_command.command)
-        menu.divider(menu_list, chat_command.command)
-        menu.action(menu_list, "Run", {chat_command.override_action_command or chat_command.command}, get_menu_action_help(chat_command), function(click_type, pid)
+        local command_name = get_command_name(chat_command)
+        local menu_list = menu.list(chat_commands_menu_list, command_name)
+        menu.divider(menu_list, command_name)
+        menu.action(menu_list, "Run", {chat_command.override_action_command or command_name}, get_menu_action_help(chat_command), function(click_type, pid)
             if chat_command.func ~= nil then
-                return chat_command.func(pid, {chat_command.command}, chat_command)
+                return chat_command.func(pid, {command_name}, chat_command)
             end
         end)
         menu.action(menu_list, "Help", {}, get_menu_action_help(chat_command), function(click_type, pid)
