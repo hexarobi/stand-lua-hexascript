@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b9"
+local SCRIPT_VERSION = "0.16b10"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -147,11 +147,11 @@ local config = {
     announcements = {
         {
             name="Basic Commands",
-            messages={"Chat commands are enabled for everyone in this lobby. Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help"},
+            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help"},
         },
         {
             name="Roulette",
-            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin. For full details try !roulette"},
+            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin, up to $14mil per hour. For full details try !roulette"},
             validator=function()
                 return hexascript.is_player_in_casino(players.user())
             end
@@ -177,11 +177,13 @@ local config = {
         luxington={x=3071.25, y=-4729.30, z=15.26},
         mckenzie={ x=2137.5266, y=4799.469, z=40.61362 },
         maze={ x=-75.15735, y=-818.50104, z=326.1752 },
+        observatory={ x=-408.3328, y=1179.3496, z=325.6197 },
         paleto={ x=-303.0619, y=6247.989, z=31.432796 },
         pier={ x=-1716.3751, y=-1090.788, z=13.085348 },
         rex={ x=2571.9, y=2560.1484, z=34.401012 },
         sandy={ x=1756.956, y=3270.2417, z=40.565292 },
         simeons={ x=-73.73742, y=-1123.4886, z=25.499369 },
+        soccer={ x=771.17, y=-232.47, z=65.79 },
         southbeach={ x=-1116.8607, y=-1717.6504, z=4.013644 },
         strip={ x=118.78938, y=-1313.6859, z=28.91388 },
         videogeddon={ x=709.92834, y=-831.8337, z=24.115917 },
@@ -197,7 +199,8 @@ local config = {
         sandyshores="sandy",
         vanilla="strip",
         video="videogeddon",
-    }
+    },
+    special_players={"Agnetha-", "TonyTrivia", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316"}
 }
 
 local menus = {}
@@ -249,6 +252,8 @@ local VEHICLE_MODEL_SHORTCUTS = {
     buffalostx = "buffalo4",
     vigerozx = "vigero2",
     stirlinggt = "feltzer3",
+    ["8f"] = "drafter",
+    ["9f"] = "ninef",
     ["10f"] = "tenf",
     ["10fwide"] = "tenf2",
     ["10f2"] = "tenf2",
@@ -267,6 +272,9 @@ local VEHICLE_MODEL_SHORTCUTS = {
     rattruck = "ratloader2",
     liberator = "monster",
     ruiner2000 = "ruiner2",
+    rampantrocket = "rrocket",
+    jb700w = "jb7002",
+    rocketvoltic = "voltic2",
     -- Thanks EndGame for additional aliases!
     d10 = "coquette4",
     xxr = "entity2",
@@ -292,6 +300,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     gtb = "italigtb",
     gtb2 = "italigtb2",
     xo = "torero2",
+    toreroxo = "torero2",
     dv8 = "deveste",
     roosevelt = "btype",
     frankenstange = "btype2",
@@ -350,6 +359,11 @@ local passthrough_commands = {
         outbound_command="casinotp",
         requires_player_name=true,
     },
+    {
+        command="engineboost",
+        outbound_command="giveenginepower",
+        requires_player_name=true,
+    },
 }
 
 ---
@@ -374,6 +388,18 @@ local function array_remove(t, fnKeep)
     end
 
     return t;
+end
+
+local function BitTest(value, bit)
+    return value & (1 << bit) ~= 0
+end
+
+local function BitSet(value, bit)
+    return value | (1 << bit)
+end
+
+local function BitClear(value, bit)
+    return value & ~(1 << bit)
 end
 
 ---
@@ -1133,6 +1159,64 @@ local function teleport_vehicle_to_coords(vehicle, x, y, z)
     VEHICLE.SET_VEHICLE_ON_GROUND_PROPERLY(vehicle, 5)
 end
 
+-- Based on GiftVehicle by Mr.Robot
+local function gift_vehicle_to_player(pid, vehicle)
+    local ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
+    local pid_hash = NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid)
+    local check = memory.script_global(78558)
+
+    local spawned_model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle))
+
+    memory.write_int(check, 0)
+
+    local bitset = DECORATOR.DECOR_GET_INT(vehicle, "MPBitset")
+
+    bitset = BitClear(bitset, 3)
+    bitset = BitSet(bitset, 24)
+
+    DECORATOR.DECOR_SET_INT(vehicle, "MPBitset", bitset)
+    DECORATOR.DECOR_SET_INT(vehicle, "Previous_Owner", 0)
+    DECORATOR.DECOR_SET_INT(vehicle, "PV_Slot", 0)
+    DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", pid_hash)
+    DECORATOR.DECOR_SET_INT(vehicle, "Veh_Modded_By_Player", pid_hash)
+
+    help_message(pid, "You may now park this car in your garage. The garage must be full of free cars when you park and replace a free car with this one.")
+
+    local interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
+    local pos = ENTITY.GET_ENTITY_COORDS(ped, true)
+    local end_time
+
+    -- Wait until garage is entered
+    end_time = util.current_time_millis() + 15000
+    repeat
+        interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
+        util.yield()
+    until interior ~= 0 or util.current_time_millis() >= end_time
+
+    memory.write_int(check, 1)
+
+    -- Wait until garage is exited
+    end_time = util.current_time_millis() + 15000
+    repeat
+        interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
+        util.yield()
+    until interior == 0 or util.current_time_millis() >= end_time
+
+    -- Delete invis leftover vehicle
+    for _, veh in pairs(entities.get_all_vehicles_as_handles()) do
+        local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(veh))
+        if model:find(spawned_model) then
+            local veh_pos = ENTITY.GET_ENTITY_COORDS(veh, true)
+            if MISC.GET_DISTANCE_BETWEEN_COORDS(pos.x, pos.y, pos.z, veh_pos.x, veh_pos.y, veh_pos.z, true) < 5.0 then
+                entities.delete_by_handle(veh)
+                break
+            end
+        end
+    end
+
+end
+
+
 --local function gift_vehicle_to_player(pid)
 --    local vehicle = get_player_vehicle_in_control(pid)
 --    if vehicle then
@@ -1197,7 +1281,9 @@ add_chat_command{
     command="help",
     help={
         "Welcome! Please don't grief others. For help with a specific command say !help <COMMAND>",
-        "Available command categories: SELF, VEHICLE, MONEY",
+        "SELF commands: !autoheal, !bail, !allguns, !tp, !vip, !unstick, !tpme, !cleanup, !money",
+        "VEHICLE commands: !spawn, !gift, !paint, !mods, !wheels, !shuffle, !tune, !topspeed, !gravity",
+        "!headlights, !neonlights, !wheelcolor, !tires, !livery, !plate, !platetype, !horn, !repair",
     },
     func=function(pid, commands, this_chat_command)
         if type(commands) == "table" then
@@ -1259,17 +1345,25 @@ add_chat_command{
     help={
        "First fill a garage with FREE cars from Legendary Motor. Use !gift, then drive into garage and REPLACE a free car. For step-by-step instructions use !help gift1"
     },
-    func=function(pid, commands)
+    func=function(pid)
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle == 0 then
             help_message(pid, "You must be in a vehicle to use !gift")
         else
-            --delete_nearby_invis_vehicles(pid)
-            local command_string = "gift " .. players.get_name(pid)
-            menu.trigger_commands(command_string)
-            help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
+            gift_vehicle_to_player(pid, vehicle)
         end
     end
+    --func=function(pid, commands)
+    --    local vehicle = get_player_vehicle_in_control(pid)
+    --    if vehicle == 0 then
+    --        help_message(pid, "You must be in a vehicle to use !gift")
+    --    else
+    --        --delete_nearby_invis_vehicles(pid)
+    --        local command_string = "gift " .. players.get_name(pid)
+    --        menu.trigger_commands(command_string)
+    --        help_message(pid, "Success! You may now park your car in your garage. Make sure to REPLACE another car to keep this one!")
+    --    end
+    --end
 }
 
 add_chat_command{
@@ -1293,9 +1387,6 @@ add_chat_command{
         "#6 Drive into garage, and when prompted, choose YES to replace one of the free car with your spawned car",
         "If done correctly the vehicle should now be yours. For more tips and troubleshooting try !help gift3"
     },
-    func=function(pid, commands, chat_command)
-        help_message(pid, chat_command.help)
-    end
 }
 
 add_chat_command{
@@ -1386,14 +1477,14 @@ add_chat_command{
     end
 }
 
-local function request_control_once(entity)
-    if not NETWORK.NETWORK_IS_IN_SESSION() then
-        return true
-    end
-    local netId = NETWORK.NETWORK_GET_NETWORK_ID_FROM_ENTITY(entity)
-    NETWORK.SET_NETWORK_ID_CAN_MIGRATE(netId, true)
-    return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
-end
+--local function request_control_once(entity)
+--    if not NETWORK.NETWORK_IS_IN_SESSION() then
+--        return true
+--    end
+--    local netId = NETWORK.NETWORK_GET_NETWORK_ID_FROM_ENTITY(entity)
+--    NETWORK.SET_NETWORK_ID_CAN_MIGRATE(netId, true)
+--    return NETWORK.NETWORK_REQUEST_CONTROL_OF_ENTITY(entity)
+--end
 
 --add_chat_command{
 --    command="fly",
@@ -2139,7 +2230,7 @@ add_chat_command{
 }
 
 local function is_player_special(pid)
-    for _, player_name in pairs({"CallMeCamarena", "CallMeCam", "TonyT", "vibes_xd7", "hexarobo", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "Tobwater09"}) do
+    for _, player_name in pairs(config.special_players) do
         if players.get_name(pid) == player_name then
             return true
         end
@@ -2153,6 +2244,16 @@ add_chat_command{
         if is_player_special(pid) then
             help_message(pid, "Special access granted. Attempting to kick "..commands[2])
             menu.trigger_commands("breakup " .. commands[2])
+        end
+    end
+}
+
+add_chat_command{
+    command="newlobby",
+    func=function(pid, commands)
+        if is_player_special(pid) then
+            help_message(pid, "Special access granted. Joining a new lobby")
+            menu.trigger_commands("gosolopub")
         end
     end
 }
@@ -2439,11 +2540,6 @@ end
 menus.announcements = menu.list(menu.my_root(), "Announcements")
 for index, announcement in ipairs(config.announcements) do
     local menu_list = menu.list(menus.announcements, announcement.name, {}, "")
-    for message_index, message in ipairs(announcement.messages) do
-        menu.text_input(menu_list, "Message "..message_index, {"hexascripteditannouncement_"..index.."_"..message_index}, "Edit announcement content", function(value)
-            announcement.messages[message_index] = value
-        end, message)
-    end
     menu.action(menu_list, "Announce", {}, "Broadcast this announcement to the lobby", function()
         announce(announcement)
     end)
@@ -2455,6 +2551,11 @@ for index, announcement in ipairs(config.announcements) do
     menu.slider(menu_list, "Delay", {}, "Time between repeats of this announcement, in minutes.", 15, 120, announcement.delay, 15, function(value)
         announcement.delay = value
     end)
+    for message_index, message in ipairs(announcement.messages) do
+        menu.text_input(menu_list, "Message "..message_index, {"hexascripteditannouncement_"..index.."_"..message_index}, "Edit announcement content", function(value)
+            announcement.messages[message_index] = value
+        end, message)
+    end
     menu.readonly(menu_list, "Last Announced", announcement.last_announced or "Never")
 end
 
@@ -2466,9 +2567,9 @@ local menu_options = menu.list(menu.my_root(), "Options")
 menu.list_select(menu_options, "Chat Control Character", {}, "Set the character that chat commands must begin with", control_characters, config.chat_control_character_index, function(index)
     config.chat_control_character_index = index
 end)
-menu.toggle(menu_options, "Allow by Default", {}, "Any commands with the `Default` op.", function(toggle)
-    config.allow_by_default = toggle
-end, config.allow_by_default)
+--menu.toggle(menu_options, "Allow by Default", {}, "Any commands with the `Default` op.", function(toggle)
+--    config.allow_by_default = toggle
+--end, config.allow_by_default)
 menu.toggle(menu_options, "Auto-Spectate Far Away Players", {}, "If enabled, you will automatically spectate players who issue commands from far away. Without this far away players will get an error when issuing commands.", function(toggle)
     config.auto_spectate_far_away_players = toggle
 end, config.auto_spectate_far_away_players)
