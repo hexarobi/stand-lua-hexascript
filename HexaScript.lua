@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b14"
+local SCRIPT_VERSION = "0.16b15"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -359,11 +359,11 @@ local passthrough_commands = {
         outbound_command="casinotp",
         requires_player_name=true,
     },
-    {
-        command="engineboost",
-        outbound_command="giveenginepower",
-        requires_player_name=true,
-    },
+    --{
+    --    command="engineboost",
+    --    outbound_command="giveenginepower",
+    --    requires_player_name=true,
+    --},
 }
 
 ---
@@ -1980,7 +1980,7 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="engineboost",
+    command={"engineboost", "eb"},
     help="Sets Engine Power",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1990,6 +1990,31 @@ add_chat_command{
             if value < 1 then value = 1 end
             menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " " ..value)
             help_message(pid, "Engine power has been set to "..value)
+        end
+    end
+}
+
+add_chat_command{
+    command="fast",
+    help="Makes your car go fast",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local enabled_string = get_on_off_string(commands[2])
+            local enabled = (enabled_string == "ON")
+            if enabled then
+                VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 10000)
+                ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 10000)
+                entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 50)
+                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 20")
+                help_message(pid, "Car go fast is on")
+            else
+                VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 100)
+                ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 100)
+                entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 10)
+                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 1")
+                help_message(pid, "Car go fast is off")
+            end
         end
     end
 }
