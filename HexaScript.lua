@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b16"
+local SCRIPT_VERSION = "0.16b17"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -52,6 +52,7 @@ local auto_update_config = {
             name="constants",
             source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/constants.lua",
             script_relpath="lib/hexascript/constants.lua",
+            switch_to_branch=selected_branch,
             is_required=true,
             verify_file_begins_with="--",
         },
