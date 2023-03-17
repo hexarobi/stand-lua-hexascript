@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b17"
+local SCRIPT_VERSION = "0.16b18"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -2155,12 +2155,22 @@ add_chat_command{
     command="traffic",
     help="Sets traffic on or off for the entire lobby",
     func=function(pid, commands)
-        local enabled_string = get_on_off_string(commands[2])
+        local enabled_string
+        local vehicle_multiplier = tonumber(commands[2])
+        if vehicle_multiplier == nil then
+            enabled_string = get_on_off_string(commands[2])
+            vehicle_multiplier = 0.0
+        else
+            enabled_string = "OFF"
+        end
         local enabled = (enabled_string == "ON")
         if not enabled then
-            pop_multiplier_id = MISC.ADD_POP_MULTIPLIER_SPHERE(1.1, 1.1, 1.1, 15000.0, 0.0, 0.0, false, true)
+            if pop_multiplier_id ~= nil then
+                MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
+            end
+            pop_multiplier_id = MISC.ADD_POP_MULTIPLIER_SPHERE(1.1, 1.1, 1.1, 15000.0, 0.0, vehicle_multiplier, false, true)
             MISC.CLEAR_AREA(1.1, 1.1, 1.1, 19999.9, true, false, false, true)
-            help_message(pid, "Traffic off for lobby")
+            help_message(pid, "Traffic vehicle multiplier set to "..vehicle_multiplier)
         else
             MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
             help_message(pid, "Traffic on for lobby")
@@ -2304,6 +2314,30 @@ add_chat_command{
         local enabled_string = get_on_off_string(commands[2])
         menu.trigger_commands("bail " .. players.get_name(pid) .. " " .. enabled_string)
         help_message(pid, "Bail " .. enabled_string)
+    end
+}
+
+add_chat_command{
+    command="autobail",
+    help="Combines autoheal and bail",
+    func=function(pid, commands)
+        local enabled_string = get_on_off_string(commands[2])
+        menu.trigger_commands("bail " .. players.get_name(pid) .. " " .. enabled_string)
+        menu.trigger_commands("autoheal " .. players.get_name(pid) .. " " .. enabled_string)
+        help_message(pid, "Auto-Heal + Bail " .. enabled_string)
+    end
+}
+
+add_chat_command{
+    command="wanted",
+    help="Set the number of wanted stars you have",
+    func=function(pid, commands)
+        local wanted_level = tonumber(commands[2])
+        if wanted_level == nil then
+            wanted_level = 0
+        end
+        menu.trigger_commands("pwanted " .. players.get_name(pid) .. " " .. wanted_level)
+        help_message(pid, "Set wanted level to " .. wanted_level)
     end
 }
 
