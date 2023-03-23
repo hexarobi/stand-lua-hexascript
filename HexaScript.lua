@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b18"
+local SCRIPT_VERSION = "0.16b19"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -2364,7 +2364,7 @@ add_chat_command{
     func=function(pid, commands)
         if is_player_special(pid) then
             help_message(pid, "Special access granted. Attempting to kick "..commands[2])
-            menu.trigger_commands("breakup " .. commands[2])
+            menu.trigger_commands("kick " .. commands[2])
         end
     end
 }
@@ -2375,6 +2375,36 @@ add_chat_command{
         if is_player_special(pid) then
             help_message(pid, "Special access granted. Joining a new lobby")
             menu.trigger_commands("gosolopub")
+        end
+    end
+}
+
+add_chat_command{
+    command="ping",
+    func=function(pid)
+        help_message(pid, "Pong! Your chat message was heard.")
+    end
+}
+
+local event_menus = {
+    bizbattle="Online>Session>Session Scripts>Run Script>Freemode Activities>Business Battle 1",
+    challenges="Online>Session>Session Scripts>Run Script>Freemode Activities>Challenges",
+    checkpoints="Online>Session>Session Scripts>Run Script>Freemode Activities>Checkpoint Collection",
+    damage="Online>Session>Session Scripts>Run Script>Freemode Activities>Criminal Damage",
+    holdthewheel="Online>Session>Session Scripts>Run Script>Freemode Activities>Hold the Wheel",
+}
+
+add_chat_command{
+    command="event",
+    func=function(pid, commands)
+        local event_name = commands[2]
+        if event_name and event_menus[event_name] then
+            local command_menu = menu.ref_by_path(event_menus[event_name])
+            if not menu.is_ref_valid(command_menu) then error("Invalid event ref") end
+            menu.trigger_command(command_menu)
+            help_message(pid, "Triggered event: "..event_name)
+        else
+            help_message(pid, "Invalid event try: bizbattle, challenges, checkpoints, damage, holdthewheel")
         end
     end
 }
