@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.16b19"
+local SCRIPT_VERSION = "0.17b1"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -558,6 +558,15 @@ local function force_roulette_area()
         },
     }, players.user()) then
         ENTITY.SET_ENTITY_COORDS(players.user_ped(), 1138.828, 256.55817, -51.035732)
+    end
+end
+
+local function force_rig_roulette()
+    local rig_roulette_menu = menu.ref_by_path("Online>Quick Progress>Casino>Roulette Outcome")
+    if menu.is_ref_valid(rig_roulette_menu) then
+        rig_roulette_menu.value = 1
+    else
+        error("Failed to get command ref to rig roulette")
     end
 end
 
@@ -2599,6 +2608,7 @@ local function afk_casino_tick()
         enter_casino()
     else
         force_roulette_area()
+        force_rig_roulette()
     end
 end
 
