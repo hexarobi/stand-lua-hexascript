@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b1"
+local SCRIPT_VERSION = "0.17b2"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -563,7 +563,7 @@ end
 
 local function force_rig_roulette()
     local rig_roulette_menu = menu.ref_by_path("Online>Quick Progress>Casino>Roulette Outcome")
-    if menu.is_ref_valid(rig_roulette_menu) then
+    if menu.is_ref_valid(rig_roulette_menu) and rig_roulette_menu.value ~= 1 then
         rig_roulette_menu.value = 1
     else
         error("Failed to get command ref to rig roulette")
@@ -1976,7 +1976,11 @@ add_chat_command{
         if vehicle then
             local torque_value = 500
             if commands[2] then
-                torque_value = tonumber(commands[2])
+                if commands[2] == "max" then
+                    torque_value = 10000
+                else
+                    torque_value = tonumber(commands[2])
+                end
             end
             if torque_value < 1 then torque_value = 1 end
             if torque_value > 10000 then torque_value = 10000 end
