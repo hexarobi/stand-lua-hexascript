@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b2"
+local SCRIPT_VERSION = "0.17b3"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -201,7 +201,7 @@ local config = {
         vanilla="strip",
         video="videogeddon",
     },
-    special_players={"Agnetha-", "TonyTrivia", "goldberg1122", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316"}
+    special_players={"Agnetha-", "TonyTrivia", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame"}
 }
 
 local menus = {}
@@ -403,6 +403,15 @@ local function BitClear(value, bit)
     return value & ~(1 << bit)
 end
 
+local function is_player_special(pid)
+    for _, player_name in pairs(config.special_players) do
+        if players.get_name(pid) == player_name then
+            return true
+        end
+    end
+    return false
+end
+
 ---
 --- Constructor Spawnable Constructs Passthrough Commands
 ---
@@ -563,8 +572,10 @@ end
 
 local function force_rig_roulette()
     local rig_roulette_menu = menu.ref_by_path("Online>Quick Progress>Casino>Roulette Outcome")
-    if menu.is_ref_valid(rig_roulette_menu) and rig_roulette_menu.value ~= 1 then
-        rig_roulette_menu.value = 1
+    if menu.is_ref_valid(rig_roulette_menu) then
+        if rig_roulette_menu.value ~= 1 then
+            rig_roulette_menu.value = 1
+        end
     else
         error("Failed to get command ref to rig roulette")
     end
@@ -2075,6 +2086,20 @@ add_chat_command{
 }
 
 add_chat_command{
+    command="dv",
+    help="Deletes the car you are in",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle == 0 then
+            help_message(pid, "You are not in a vehicle")
+        else
+            help_message(pid, "Attempting to delete your current vehicle, thanks for keeping the lobby clean")
+            menu.trigger_commands("delveh" .. players.get_name(pid))
+        end
+    end
+}
+
+add_chat_command{
     command="noclip",
     help="Sets vehicle no clip",
     func=function(pid, commands)
@@ -2270,6 +2295,25 @@ add_chat_command{
 }
 
 add_chat_command{
+    command="tptome",
+    help="Sends me to your position",
+    func=function(pid, commands)
+        local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
+        local vehicle = PED.GET_VEHICLE_PED_IS_IN(target_ped, false)
+        if is_player_special(pid) and not players.is_in_interior(pid) and not hexascript.is_player_in_casino(pid) then
+            help_message(pid, "Special access granted. Sending me to join you")
+            if vehicle == 0 then
+                menu.trigger_commands("tp " .. players.get_name(pid))
+            else
+                menu.trigger_commands("tpveh " .. players.get_name(pid))
+            end
+        else
+            help_message(pid, "Something has gone wrong.  Are you inside?")
+        end
+    end
+}
+
+add_chat_command{
     command="quickboost",
     help="Set vehicle boost to quick recharge",
     func=function(pid, commands)
@@ -2362,15 +2406,6 @@ add_chat_command{
         menu.trigger_commands("ammo" .. players.get_name(pid))
     end
 }
-
-local function is_player_special(pid)
-    for _, player_name in pairs(config.special_players) do
-        if players.get_name(pid) == player_name then
-            return true
-        end
-    end
-    return false
-end
 
 add_chat_command{
     command="bb",
@@ -2612,7 +2647,7 @@ local function afk_casino_tick()
         enter_casino()
     else
         force_roulette_area()
-        force_rig_roulette()
+        -- force_rig_roulette()
     end
 end
 
