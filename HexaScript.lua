@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b3"
+local SCRIPT_VERSION = "0.17b4"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -201,7 +201,7 @@ local config = {
         vanilla="strip",
         video="videogeddon",
     },
-    special_players={"Agnetha-", "TonyTrivia", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame"}
+    special_players={"Agnetha-", "TonyTrivia", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame", "aTet_sj408", "Rufus_Xavier"}
 }
 
 local menus = {}
@@ -2160,19 +2160,17 @@ add_chat_command{
     help="Sets vehicle to TheEndGame style",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
+        local player = players.get_name(pid)
         if vehicle then
             VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
             VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
-            --VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 60, 0, 0)
-            --VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 60, 0, 0)
-            --VEHICLE.SET_VEHICLE_COLOUR_COMBINATION(vehicle, 50)
             VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
             VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
             VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 60, 0, 0)
             VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, 0, 0, 0)
             VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_XENONLIGHTS, true)
             VEHICLE.SET_VEHICLE_XENON_LIGHT_COLOR_INDEX(vehicle, 8)
-            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, -1, 136)
+            --VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, -1, 136)
             VEHICLE.SET_VEHICLE_TYRE_SMOKE_COLOR(vehicle, 255, 0, 0)
             VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 0, true)
             VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 1, true)
@@ -2182,8 +2180,12 @@ add_chat_command{
             VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, 11)
             VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 26)
             VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 26)
-            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 8)
-            vehicle_set_plate(vehicle, "TEG")
+            VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 44, 8)
+            if player == "-TheEndGame" then
+                vehicle_set_plate(vehicle, "TEG")
+            else
+                vehicle_set_plate(vehicle, "IMPOSTER")
+            end
         end
     end
 }
@@ -2404,6 +2406,42 @@ add_chat_command{
     func=function(pid, commands)
         --WEAPON.SET_PED_INFINITE_AMMO(PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid), true, util.joaat("firework"))
         menu.trigger_commands("ammo" .. players.get_name(pid))
+    end
+}
+
+add_chat_command{
+    command="nolock",
+    help="Prevents vehicle from being locked on by others missiles",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local enabled_string = get_on_off_string(commands[2])
+            local enabled = (enabled_string == "ON")
+            menu.trigger_commands("givenolockon" .. players.get_name(pid))
+            help_message(pid, "No lockon "..enabled_string)
+        end
+    end
+}
+
+add_chat_command{
+    command="casinoafk",
+    func=function(pid, commands)
+        if is_player_special(pid) then
+            if config.afk_mode == false then
+                help_message(pid, "Special access granted. I must be AFK so why not rig the tables")
+                menu.trigger_commands("scripthost")
+                config.afk_mode = true
+            else
+                if not players.is_in_interior(pid) and not hexascript.is_player_in_casino(pid) then
+                    help_message(pid, "Special access granted. I must stop rigging the tables.  Coming to you.")
+                    config.afk_mode = false
+                    menu.trigger_commands("scripthost")
+                    menu.trigger_commands("tp" .. players.get_name(pid))
+                else
+                    help_message(pid, "Go outside please and run the command again")
+                end
+            end
+        end
     end
 }
 
