@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b5"
+local SCRIPT_VERSION = "0.17b6"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -219,7 +219,11 @@ local config = {
         vanilla="strip",
         video="videogeddon",
     },
-    special_players={"Agnetha-", "TonyTrivia", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame", "aTet_sj408", "Rufus_Xavier"}
+    custom_plate_texts ={
+        --["-TheEndGame"] = "turdface",
+        ["-TheEndGame"] = {"IMANOOB", "MYSECRET", "NONAME", "OUTATIME", "ND4SPD", "MOVEOVER", "GOFASTER", "KIDDYCAR", "THEBOMB", "KILMEPLS", "IMPOOR", "TOOPOSH", "BLINGING"}
+    },
+    special_players={"Agnetha-", "TonyTrivia", "Hexarobo", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame", "aTet_sj408", "Rufus_Xavier"}
 }
 
 local menus = {}
@@ -1046,7 +1050,25 @@ local function removeVowels(inStr)
 end
 
 local function plateify_text(plate_text)
+    if config.custom_plate_texts ~= nil and config.custom_plate_texts[plate_text] ~= nil then
+        -- Custom overrides
+        if type(config.custom_plate_texts[plate_text]) == "table" then
+            local plates = config.custom_plate_texts[plate_text]
+            plate_text = plates[math.random(1, #plates)]
+        else
+            plate_text = config.custom_plate_texts[plate_text]
+        end
+    end
     if string.len(plate_text) > 8 then
+        -- Special characters
+        plate_text = plate_text:gsub("[^A-Za-z0-9]", "")
+    end
+    if string.len(plate_text) > 8 then
+        -- Ending numbers
+        plate_text = plate_text:gsub("[0-9]+$", "")
+    end
+    if string.len(plate_text) > 8 then
+        -- Vowels
         plate_text = removeVowels(plate_text)
     end
     plate_text = string.sub(plate_text, 1, 8)
@@ -1878,6 +1900,23 @@ add_chat_command{
 }
 
 add_chat_command{
+    command="plateify",
+    help="Set the vehicles plate text",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            local text
+            if commands[2] == nil then
+                text = "-TheEndGame"
+            else
+                text = commands[2]
+            end
+            help_message(pid, "Plateify text: "..plateify_text(text))
+        end
+    end
+}
+
+add_chat_command{
     command="platetype",
     help="Set the vehicles plate type",
     func=function(pid, commands)
@@ -2063,10 +2102,15 @@ add_chat_command{
     help="Sets Engine Power",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
+        local value = 1
         if vehicle then
-            local value = tonumber(commands[2])
-            if value > 20 then value = 20 end
-            if value < 1 then value = 1 end
+            if commands[2] == "max" then
+                value = 20
+            else
+                value = tonumber(commands[2])
+                if value > 20 then value = 20 end
+                if value < 1 then value = 1 end
+            end
             menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " " ..value)
             help_message(pid, "Engine power has been set to "..value)
         end
