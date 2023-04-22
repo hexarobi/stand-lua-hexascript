@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b4"
+local SCRIPT_VERSION = "0.17b5"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -64,6 +64,13 @@ local auto_update_config = {
             is_required=true,
         },
         {
+            name="constructor_lib",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/constructor/constructor_lib.lua",
+            script_relpath="lib/hexascript/constructor_lib.lua",
+            is_required=true,
+            verify_file_begins_with="--",
+        },
+        {
             name="vehicles_list",
             source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/hexascript/vehicles.txt",
             script_relpath="lib/hexascript/vehicles.txt",
@@ -106,14 +113,24 @@ end
 local constants = libs.constants
 local colorsRGB = libs.colors
 --local inspect = libs.inspect
+local constructor_lib = libs.constructor_lib
 
 util.require_natives(1672190175)
 
+local file
 local vehicles_list = {}
-local file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
+file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles.txt")
 if file then
     for line in file:lines() do
         table.insert(vehicles_list, line)
+    end
+end
+
+local vehicles_list_4_door = {}
+file = io.open(filesystem.scripts_dir().."/lib/hexascript/vehicles_4_door.txt")
+if file then
+    for line in file:lines() do
+        table.insert(vehicles_list_4_door, line)
     end
 end
 
@@ -143,6 +160,7 @@ local config = {
     lobby_created_at = util.current_time_millis(),
     fresh_lobby_delay = 600000,
     min_num_players = 3,
+    is_player_allowed_to_bypass_commands_limit = true,
     user_max_commands_per_time = 3,
     user_command_time = 30000,
     announcements = {
@@ -672,7 +690,7 @@ local function spawn_vehicle_for_player(model_name, pid, offset)
         despawn_for_player(pid)
         load_hash(model)
         local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
-        if offset == nil then offset = {x=0, y=4.0, z=0.5} end
+        if offset == nil then offset = {x=0, y=5.5, z=0.5} end
         local pos = ENTITY.GET_OFFSET_FROM_ENTITY_IN_WORLD_COORDS(target_ped, offset.x, offset.y, offset.z)
         local heading = ENTITY.GET_ENTITY_HEADING(target_ped)
         local vehicle = entities.create_vehicle(model, pos, heading)
@@ -1001,6 +1019,7 @@ end
 local function shuffle_vehicle(vehicle)
     shuffle_mods(vehicle)
     shuffle_paint(vehicle)
+    shuffle_livery(vehicle)
     shuffle_wheels(vehicle)
 end
 
@@ -1035,9 +1054,9 @@ local function plateify_text(plate_text)
 end
 
 local function vehicle_set_plate(vehicle, plate_text)
-    ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
+    --ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT(vehicle, plate_text)
-    ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
+    --ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
 end
 
 local function get_enum_value_name(enum_name, enum_value)
@@ -1061,8 +1080,8 @@ local function vehicle_set_plate_type(pid, vehicle, plate_type_num)
     help_message(pid, "Plate type set to " .. plate_type_name)
     end
 
-local function vehicle_set_nameplate(vehicle, player_name)
-    vehicle_set_plate(vehicle, plateify_text(player_name))
+local function vehicle_set_nameplate(vehicle, pid)
+    vehicle_set_plate(vehicle, plateify_text(players.get_name(pid)))
 end
 
 local function apply_vehicle_model_name_shortcuts(vehicle_model_name)
@@ -1084,6 +1103,7 @@ end
 -- From Jackz Vehicle Options script
 -- Gets the player's vehicle, attempts to request control. Returns 0 if unable to get control
 local function get_player_vehicle_in_control(pid, opts)
+    if not opts then opts = {} end
     local my_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(players.user()) -- Needed to turn off spectating while getting control
     local target_ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
 
@@ -1116,7 +1136,7 @@ local function get_player_vehicle_in_control(pid, opts)
         HUD.BUSYSPINNER_OFF()
     end
 
-    if vehicle > 0 then
+    if vehicle > 0 and opts.no_control ~= false then
         if NETWORK.NETWORK_HAS_CONTROL_OF_ENTITY(vehicle) then
             return vehicle
         end
@@ -1137,6 +1157,7 @@ local function get_player_vehicle_in_control(pid, opts)
             end
         end
     end
+
     if not was_spectating then
         NETWORK.NETWORK_SET_IN_SPECTATOR_MODE(false, target_ped)
     end
@@ -1168,10 +1189,20 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
         local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
         if vehicle then
             max_mods(vehicle)
-            shuffle_wheels(vehicle)
-            shuffle_paint(vehicle)
-            shuffle_livery(vehicle)
-            --vehicle_set_nameplate(vehicle, players.get_name(pid))
+            shuffle_vehicle(vehicle)
+            vehicle_set_nameplate(vehicle, pid)
+            return false
+        end
+    end
+end
+
+local function spawn_shuffled_vehicle_4_door_for_player(pid)
+    local vehicle_model_name = vehicles_list_4_door[math.random(#vehicles_list_4_door)]
+    if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
+        local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
+        if vehicle then
+            max_mods(vehicle)
+            shuffle_vehicle(vehicle)
             return false
         end
     end
@@ -1502,9 +1533,31 @@ add_chat_command{
     command="spawn",
     help="Spawn a shuffled vehicle",
     func=function(pid, commands)
-        local vehicle = get_player_vehicle_in_control(pid)
+        spawn_shuffled_vehicle_for_player(commands[2], pid)
+    end
+}
+
+add_chat_command{
+    command="4door",
+    help="Spawn a shuffled 4-door vehicle",
+    func=function(pid, commands)
+        spawn_shuffled_vehicle_4_door_for_player(pid)
+    end
+}
+
+add_chat_command{
+    command="copy",
+    help="Spawn a copy of your current vehicle",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid, {no_control=true})
         if vehicle then
-            spawn_shuffled_vehicle_for_player(commands[2], pid)
+            local construct = constructor_lib.copy_construct_plan(constructor_lib.construct_base)
+            construct.type = "VEHICLE"
+            construct.handle = vehicle
+            constructor_lib.default_entity_attributes(construct)
+            constructor_lib.serialize_vehicle_attributes(construct)
+            construct.handle = spawn_vehicle_for_player(construct.model, pid)
+            constructor_lib.deserialize_vehicle_attributes(construct)
         end
     end
 }
@@ -1814,7 +1867,8 @@ add_chat_command{
         local vehicle = get_player_vehicle_in_control(pid)
         if vehicle then
             if commands[2] == nil then
-                help_message(pid, "You must supply some text to set your plate text")
+                vehicle_set_nameplate(vehicle, pid)
+                help_message(pid, "Vehicle plate set to name")
             else
                 vehicle_set_plate(vehicle, commands[2])
                 help_message(pid, "Vehicle plate set")
@@ -2024,21 +2078,38 @@ add_chat_command{
     help="Makes your car go fast",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle then
-            local enabled_string = get_on_off_string(commands[2])
-            local enabled = (enabled_string == "ON")
-            if enabled then
-                VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 10000)
-                ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 10000)
-                entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 50)
-                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 20")
-                help_message(pid, "Car go fast is on")
-            else
+        if vehicle ~= 0 then
+            local fast_percent = tonumber(commands[2])
+            --local enabled_string = get_on_off_string(commands[2])
+            --local enabled = (enabled_string == "ON")
+            if fast_percent then
+                if fast_percent <= 0 then
+                    fast_percent = 1
+                end
+                if fast_percent > 100 then
+                    fast_percent = 100
+                end
+                -- help_message(pid, "Applying " .. fast_percent .. " percent fast to your vehicle")
+                help_message(pid, "Top speed set to " .. math.ceil(10000 * (fast_percent / 100)))
+                VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, math.ceil(10000 * (fast_percent / 100)))
+                help_message(pid, "Max speed set to " .. math.ceil(10000 * (fast_percent / 100)))
+                ENTITY.SET_ENTITY_MAX_SPEED(vehicle, math.ceil(10000 * (fast_percent / 100)))
+                help_message(pid, "Gravity set to " .. math.ceil(40 * (fast_percent / 100)) + 10)
+                entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), math.ceil(40 * (fast_percent / 100)) + 10)
+                help_message(pid, "Engine boose set to " .. math.ceil(20 * (fast_percent / 100)))
+                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " " .. math.ceil(20 * (fast_percent / 100)))
+            elseif commands[2] == "off" then
                 VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 100)
                 ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 100)
                 entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 10)
                 menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 1")
                 help_message(pid, "Car go fast is off")
+            else
+                VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 10000)
+                ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 10000)
+                entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 50)
+                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 20")
+                help_message(pid, "Car go fast is on")
             end
         end
     end
@@ -2342,7 +2413,8 @@ add_chat_command{
     command="allguns",
     help="Get all possible weapons",
     func=function(pid, commands)
-        menu.trigger_commands("arm " .. players.get_name(pid))
+        menu.trigger_commands("arm" .. players.get_name(pid).."all")
+        help_message(pid, "All guns acquired")
     end
 }
 
@@ -2578,7 +2650,8 @@ local function is_user_allowed_to_issue_chat_command(pid, commands)
     if user_command_log[rockstar_id] == nil then user_command_log[rockstar_id] = {} end
 
     local new_user_log = build_new_user_log(user_command_log[rockstar_id])
-    if #new_user_log > (config.user_max_commands_per_time - 1) then
+    if #new_user_log > (config.user_max_commands_per_time - 1) and
+            not (pid == players.user() and config.is_player_allowed_to_bypass_commands_limit) then
         help_message(pid, "Please slow down your commands.")
         return false
     end
