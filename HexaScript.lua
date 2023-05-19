@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b6"
+local SCRIPT_VERSION = "0.17b7"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -223,7 +223,7 @@ local config = {
         --["-TheEndGame"] = "turdface",
         ["-TheEndGame"] = {"IMANOOB", "MYSECRET", "NONAME", "OUTATIME", "ND4SPD", "MOVEOVER", "GOFASTER", "KIDDYCAR", "THEBOMB", "KILMEPLS", "IMPOOR", "TOOPOSH", "BLINGING"}
     },
-    special_players={"Agnetha-", "TonyTrivia", "Hexarobo", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame", "aTet_sj408", "Rufus_Xavier"}
+    special_players={"Agnetha-", "TonyTrivia", "Hexarobo", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame", "aTet_sj408", "Rufus_Xavier", "ashwebninja"}
 }
 
 local menus = {}
@@ -359,6 +359,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     panther = "panthere",
     ["300r"] = "r300",
     m100 = "tulip2",
+    ver = "verlierer2",
 }
 
 local vehicles_with_invalid_mods = {
@@ -2111,7 +2112,7 @@ add_chat_command{
                 if value > 20 then value = 20 end
                 if value < 1 then value = 1 end
             end
-            menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " " ..value)
+            menu.trigger_commands("givepower " .. players.get_name(pid) .. " " ..value)
             help_message(pid, "Engine power has been set to "..value)
         end
     end
@@ -2141,18 +2142,18 @@ add_chat_command{
                 help_message(pid, "Gravity set to " .. math.ceil(40 * (fast_percent / 100)) + 10)
                 entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), math.ceil(40 * (fast_percent / 100)) + 10)
                 help_message(pid, "Engine boose set to " .. math.ceil(20 * (fast_percent / 100)))
-                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " " .. math.ceil(20 * (fast_percent / 100)))
+                menu.trigger_commands("givepower " .. players.get_name(pid) .. " " .. math.ceil(20 * (fast_percent / 100)))
             elseif commands[2] == "off" then
                 VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 100)
                 ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 100)
                 entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 10)
-                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 1")
+                menu.trigger_commands("givepower " .. players.get_name(pid) .. " 1")
                 help_message(pid, "Car go fast is off")
             else
                 VEHICLE.MODIFY_VEHICLE_TOP_SPEED(vehicle, 10000)
                 ENTITY.SET_ENTITY_MAX_SPEED(vehicle, 10000)
                 entities.set_gravity_multiplier(entities.handle_to_pointer(vehicle), 50)
-                menu.trigger_commands("giveenginepower " .. players.get_name(pid) .. " 20")
+                menu.trigger_commands("givepower " .. players.get_name(pid) .. " 20")
                 help_message(pid, "Car go fast is on")
             end
         end
