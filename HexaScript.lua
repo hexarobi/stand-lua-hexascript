@@ -2210,7 +2210,7 @@ add_chat_command{
             help_message(pid, "You are not in a vehicle")
         else
             help_message(pid, "Attempting to delete your current vehicle, thanks for keeping the lobby clean")
-            menu.trigger_commands("delveh" .. players.get_name(pid))
+            entities.delete_by_handle(vehicle)
         end
     end
 }
