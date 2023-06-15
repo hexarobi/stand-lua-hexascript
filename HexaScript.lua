@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b7"
+local SCRIPT_VERSION = "0.17b8"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -166,11 +166,11 @@ local config = {
     announcements = {
         {
             name="Basic Commands",
-            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list use !help"},
+            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list say !help in chat"},
         },
         {
             name="Roulette",
-            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin, up to $14mil per hour. For full details try !roulette"},
+            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin, up to $14mil per hour. For VIP invite do !vip"},
             validator=function()
                 return hexascript.is_player_in_casino(players.user())
             end
@@ -298,6 +298,8 @@ local VEHICLE_MODEL_SHORTCUTS = {
     rampantrocket = "rrocket",
     jb700w = "jb7002",
     rocketvoltic = "voltic2",
+    f160 = "raiju",
+    streamer = "streamer216",
     -- Thanks EndGame for additional aliases!
     d10 = "coquette4",
     xxr = "entity2",
@@ -734,7 +736,9 @@ local function max_mods(vehicle)
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, math.random(-1, constants.VEHICLE_MAX_OPTIONS.WINDOW_TINTS))
     for mod_name, mod_number in pairs(constants.VEHICLE_MOD_TYPES) do
-        vehicle_set_mod_max_value(vehicle, mod_number)
+        if mod_name ~= "MOD_LIVERY" then
+            vehicle_set_mod_max_value(vehicle, mod_number)
+        end
     end
     for x = 17, 22 do
         VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, x, true)
@@ -978,7 +982,7 @@ local function set_vehicle_paint(pid, vehicle, commands)
         VEHICLE.SET_VEHICLE_CUSTOM_SECONDARY_COLOUR(vehicle, secondary_color.r, secondary_color.g, secondary_color.b)
         VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, paint_type, 0, 0)
     end
-    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+    --VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
 end
 
 local function set_vehicle_secondary_paint(pid, vehicle, commands)
@@ -1525,7 +1529,7 @@ add_chat_command{
     func=function(pid, commands)
         -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
-            -1367443755,
+            -245642440,
             players.user(),
             4,
             10000, -- wage?
@@ -1533,8 +1537,8 @@ add_chat_command{
             0,
             0,
             0,
-            memory.read_int(memory.script_global(1923597 + 9)), -- f_8
-            memory.read_int(memory.script_global(1923597 + 10)), -- f_9
+            memory.read_int(memory.script_global(1924276 + 9)), -- f_8
+            memory.read_int(memory.script_global(1924276 + 10)), -- f_9
         })
         help_message(pid, "Org invite sent. Please check your phone to accept invite.")
     end
@@ -2391,10 +2395,9 @@ add_chat_command{
         local teleport_coords
         if command == nil then
             local x, y, z, b = players.get_waypoint(pid)
-            if (x == 0.0 and y == 0.0) then
-                help_message("You must set a waypoint to teleport to, or name a location")
+            if (x ~= 0.0 and y ~= 0.0) then
+                teleport_coords = {x=x, y=y, z=z}
             end
-            teleport_coords = {x=x, y=y, z=z}
         else
             local location = command
             if config.teleport_aliases[location] ~= nil then command = config.teleport_aliases[location] end
@@ -2405,7 +2408,7 @@ add_chat_command{
             end
         end
         if teleport_coords == nil then
-            help_message(pid, "Unknown teleport location. For a list try !tp list")
+            help_message(pid, "To teleport, either select a waypoint, or include a location or player name. For a list of locations try !tp list")
         else
             teleport_vehicle_to_coords(vehicle, teleport_coords.x, teleport_coords.y, teleport_coords.z)
         end
@@ -2804,6 +2807,7 @@ local function afk_casino_tick()
     else
         force_roulette_area()
         -- force_rig_roulette()
+        util.request_script_host("casinoroulette")
     end
 end
 
