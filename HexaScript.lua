@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b8"
+local SCRIPT_VERSION = "0.17b9"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -166,15 +166,24 @@ local config = {
     announcements = {
         {
             name="Basic Commands",
-            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo) To see the full commands list say !help in chat"},
+            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo !op2 !raiju) Lose cops with !bail Heal with !autoheal Teleport with !tp For more try !help"},
         },
         {
             name="Roulette",
-            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin, up to $14mil per hour. For VIP invite do !vip"},
+            messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin ($14mil per hour) For VIP invite do !vip For more details do !roulette"},
             validator=function()
                 return hexascript.is_player_in_casino(players.user())
             end
         },
+        {
+            name="How to Gift",
+            messages={
+                "To keep spawned cars: 1. Use an empty 10-car non-DLC garage. Cheap ones by airport are good.\
+                2. Fill it full of Annis Elghy RH8 (or any free car) from Legendary Motor.",
+                "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
+                4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car."
+            },
+        }
     },
     large_vehicles = {
         "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol", "blimp", "blimp2", "blimp3",
@@ -848,8 +857,10 @@ local function shuffle_mods(vehicle)
             set_vehicle_mod_random_value(vehicle, mod_number)
         end
     end
-    for x = 17, 22 do
-        VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, x, math.random() > 0.5)
+    for mod_number = 17, 22 do
+        if not (mod_number == constants.VEHICLE_MOD_TYPES.MOD_TURBO) then
+            VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, mod_number, math.random() > 0.5)
+        end
     end
     VEHICLE.SET_VEHICLE_XENON_LIGHT_COLOR_INDEX(vehicle, math.random(-1, 12))
 end
@@ -1037,7 +1048,13 @@ local function vehicle_mods_set_max_performance(vehicle)
     vehicle_set_mod_max_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_TRANSMISSION)
     vehicle_set_mod_max_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BRAKES)
     vehicle_set_mod_max_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_ARMOR)
+    vehicle_set_mod_max_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_SPOILER)
     VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_TURBO, true)
+    -- If few roof options, assume its a weapon and max it
+    if VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, constants.VEHICLE_MOD_TYPES.MOD_ROOF) < 5 then
+        vehicle_set_mod_max_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_ROOF)
+    end
+    VEHICLE.SET_VEHICLE_TYRES_CAN_BURST(vehicle, false)
 end
 
 local function removeVowels(inStr)
@@ -1215,8 +1232,9 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
     if is_user_allowed_to_spawn_vehicles(pid, vehicle_model_name) then
         local vehicle = spawn_vehicle_for_player(vehicle_model_name, pid)
         if vehicle then
-            max_mods(vehicle)
+            --max_mods(vehicle)
             shuffle_vehicle(vehicle)
+            vehicle_mods_set_max_performance(vehicle)
             vehicle_set_nameplate(vehicle, pid)
             return false
         end
