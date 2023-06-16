@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b11"
+local SCRIPT_VERSION = "0.17b12"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -314,6 +314,12 @@ local VEHICLE_MODEL_SHORTCUTS = {
     rocketvoltic = "voltic2",
     f160 = "raiju",
     streamer = "streamer216",
+    buffaloevx = "buffalo5",
+    evx = "buffalo5",
+    cliquewagon = "clique2",
+    hotringhellfire = "gauntlet2",
+    waltonl35 = "l35",
+    walton = "l35",
     -- Thanks EndGame for additional aliases!
     d10 = "coquette4",
     xxr = "entity2",
@@ -1250,17 +1256,12 @@ end
 
 -- Based on GiftVehicle by Mr.Robot
 local function gift_vehicle_to_player(pid, vehicle)
-    local ped = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(pid)
     local pid_hash = NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid)
-    local check = memory.script_global(78558)
-
-    local spawned_model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle))
-
+    local check = memory.script_global(78689)
     memory.write_int(check, 0)
 
     local bitset = DECORATOR.DECOR_GET_INT(vehicle, "MPBitset")
-
-    bitset = BitClear(bitset, 3)
+    bitset = BitSet(bitset, 3)
     bitset = BitSet(bitset, 24)
 
     DECORATOR.DECOR_SET_INT(vehicle, "MPBitset", bitset)
@@ -1268,39 +1269,6 @@ local function gift_vehicle_to_player(pid, vehicle)
     DECORATOR.DECOR_SET_INT(vehicle, "PV_Slot", 0)
     DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", pid_hash)
     DECORATOR.DECOR_SET_INT(vehicle, "Veh_Modded_By_Player", pid_hash)
-
-    --local interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
-    --local pos = ENTITY.GET_ENTITY_COORDS(ped, true)
-    --local end_time
-
-    ---- Wait until garage is entered
-    --end_time = util.current_time_millis() + 15000
-    --repeat
-    --    interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
-    --    util.yield()
-    --until interior ~= 0 or util.current_time_millis() >= end_time
-    --
-    --memory.write_int(check, 1)
-    --
-    ---- Wait until garage is exited
-    --end_time = util.current_time_millis() + 15000
-    --repeat
-    --    interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
-    --    util.yield()
-    --until interior == 0 or util.current_time_millis() >= end_time
-    --
-    ---- Delete invis leftover vehicle
-    --for _, veh in pairs(entities.get_all_vehicles_as_handles()) do
-    --    local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(veh))
-    --    if model:find(spawned_model) then
-    --        local veh_pos = ENTITY.GET_ENTITY_COORDS(veh, true)
-    --        if MISC.GET_DISTANCE_BETWEEN_COORDS(pos.x, pos.y, pos.z, veh_pos.x, veh_pos.y, veh_pos.z, true) < 5.0 then
-    --            entities.delete_by_handle(veh)
-    --            break
-    --        end
-    --    end
-    --end
-
 end
 
 
