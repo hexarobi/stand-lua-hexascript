@@ -739,7 +739,6 @@ local function set_vehicle_mod_random_value(vehicle, vehicle_mod)
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
     if max > 0 then
         local rand_value = math.random(-1, max)
-        util.toast("Setting mod "..vehicle_mod.." to "..rand_value, TOAST_ALL)
         entities.set_upgrade_value(vehicle, vehicle_mod, rand_value)
     end
 end
