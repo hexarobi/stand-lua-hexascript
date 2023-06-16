@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b9"
+local SCRIPT_VERSION = "0.17b10"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -376,6 +376,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
 local vehicles_with_invalid_mods = {
     "entity3",
     "issi8",
+    "monstrociti",
 }
 
 local passthrough_commands = {
@@ -730,18 +731,21 @@ end
 
 local function vehicle_set_mod_max_value(vehicle, vehicle_mod)
     -- Don't apply max mods to vehicles with invalid mods to avoid crashing players
-    if does_vehicle_have_invalid_mods(vehicle) then return end
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
-    if vehicle_mod == 34 then max = -1 end  -- Don't set shifters to avoid crash
-    VEHICLE.SET_VEHICLE_MOD(vehicle, vehicle_mod, max)
+    entities.set_upgrade_value(vehicle, vehicle_mod, max)
 end
 
 local function set_vehicle_mod_random_value(vehicle, vehicle_mod)
     local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
-    VEHICLE.SET_VEHICLE_MOD(vehicle, vehicle_mod, math.random(-1, max))
+    if max > 0 then
+        local rand_value = math.random(-1, max)
+        util.toast("Setting mod "..vehicle_mod.." to "..rand_value, TOAST_ALL)
+        entities.set_upgrade_value(vehicle, vehicle_mod, rand_value)
+    end
 end
 
 local function max_mods(vehicle)
+    if does_vehicle_have_invalid_mods(vehicle) then return end
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, math.random(-1, constants.VEHICLE_MAX_OPTIONS.WINDOW_TINTS))
     for mod_name, mod_number in pairs(constants.VEHICLE_MOD_TYPES) do
@@ -759,7 +763,7 @@ local function min_mods(vehicle)
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, math.random(-1, constants.VEHICLE_MAX_OPTIONS.WINDOW_TINTS))
     for mod_name, mod_number in pairs(constants.VEHICLE_MOD_TYPES) do
-        VEHICLE.SET_VEHICLE_MOD(vehicle, mod_number, -1)
+        entities.set_upgrade_value(vehicle, mod_number, -1)
     end
     for x = 17, 22 do
         VEHICLE.TOGGLE_VEHICLE_MOD(vehicle, x, false)
@@ -842,6 +846,7 @@ end
 ---
 
 local function shuffle_mods(vehicle)
+    if does_vehicle_have_invalid_mods(vehicle) then return end
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, math.random(-1, constants.VEHICLE_MAX_OPTIONS.WINDOW_TINTS))
     for mod_name, mod_number in pairs(constants.VEHICLE_MOD_TYPES) do
@@ -870,7 +875,7 @@ local function shuffle_livery(vehicle, pid, livery_number)
     if livery_number == nil then
         livery_number = math.random(-1, max_livery_number)
     end
-    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, tonumber(livery_number))
+    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, tonumber(livery_number))
     help_message(pid, "Set vehicle livery to "..livery_number)
 end
 
@@ -879,7 +884,7 @@ local function shuffle_horn(vehicle, pid, horn_number)
     if horn_number == nil then
         horn_number = math.random(-1, max_horn_number)
     end
-    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_HORNS, tonumber(horn_number))
+    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_HORNS, tonumber(horn_number))
     help_message(pid, "Set vehicle horn to "..horn_number.." (of "..max_horn_number..")")
 end
 
@@ -913,8 +918,8 @@ local function shuffle_wheels(vehicle, pid, commands)
         end
     end
     VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, wheel_type)
-    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, wheel_kind)
-    VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, wheel_kind)
+    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, wheel_kind)
+    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, wheel_kind)
     help_message(pid, "Set wheels to "..name.." type "..wheel_kind.." (of "..max_wheel_kinds..")")
     --set_vehicle_mod_random_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS)
     --set_vehicle_mod_random_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS)
@@ -2004,7 +2009,7 @@ add_chat_command{
             if commands[2] then
                 suspension_level = commands[2]
             end
-            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_SUSPENSION, suspension_level)
+            entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_SUSPENSION, suspension_level)
             help_message(pid, "Vehicle suspension "..suspension_level)
         end
     end
@@ -2285,8 +2290,8 @@ add_chat_command{
             VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 3, true)
             VEHICLE.SET_VEHICLE_NEON_COLOUR(vehicle, 255, 50, 100)
             VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, 8)
-            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 116)
-            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 116)
+            entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 116)
+            entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 116)
             VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 136)
             vehicle_set_plate(vehicle, "Agnetha")
         end
@@ -2301,7 +2306,7 @@ add_chat_command{
         local player = players.get_name(pid)
         if vehicle then
             VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
-            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
+            entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, -1)
             VEHICLE.SET_VEHICLE_MOD_COLOR_1(vehicle, 3, 0, 0)
             VEHICLE.SET_VEHICLE_MOD_COLOR_2(vehicle, 3, 0, 0)
             VEHICLE.SET_VEHICLE_CUSTOM_PRIMARY_COLOUR(vehicle, 60, 0, 0)
@@ -2316,8 +2321,8 @@ add_chat_command{
             VEHICLE.SET_VEHICLE_NEON_ENABLED(vehicle, 3, true)
             VEHICLE.SET_VEHICLE_NEON_COLOUR(vehicle, 255, 0, 0)
             VEHICLE.SET_VEHICLE_WHEEL_TYPE(vehicle, 11)
-            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 26)
-            VEHICLE.SET_VEHICLE_MOD(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 26)
+            entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_FRONTWHEELS, 26)
+            entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_BACKWHEELS, 26)
             VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 44, 8)
             if player == "-TheEndGame" then
                 vehicle_set_plate(vehicle, "TEG")
