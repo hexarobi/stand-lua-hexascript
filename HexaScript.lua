@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b10"
+local SCRIPT_VERSION = "0.17b11"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -142,8 +142,9 @@ local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&", "*"}
 
 local state = {}
 local hexascript = {}
+local config
 
-local config = {
+config = {
     afk_mode = false,
     afk_mode_in_casino = true,
     chat_control_character = "!",
@@ -154,8 +155,10 @@ local config = {
     num_allowed_spawned_vehicles_per_player = 1,
     auto_spectate_far_away_players = true,
     lobby_mode_index = 1,
-    tick_handler_delay = 15000,
+    tick_handler_delay = 5000,
     delete_old_vehicles_tick_handler_delay = 1000,
+    is_announcement_enabled = true,
+    announce_flood_delay = 5000,
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
     fresh_lobby_delay = 600000,
@@ -172,7 +175,7 @@ local config = {
             name="Roulette",
             messages={"For anyone that wants easy money, casino roulette is now rigged to always land on 1. Come win 330k per spin ($14mil per hour) For VIP invite do !vip For more details do !roulette"},
             validator=function()
-                return hexascript.is_player_in_casino(players.user())
+                return config.afk_mode and hexascript.is_player_in_casino(players.user())
             end
         },
         {
@@ -183,6 +186,7 @@ local config = {
                 "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
                 4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car."
             },
+            is_enabled=false,
         }
     },
     large_vehicles = {
@@ -202,6 +206,7 @@ local config = {
         eclipse={ x=-775.03546, y=297.41296, z=85.46615 },
         giftgarage={ x=-1078.4542, y=-2229.311, z=12.994034 },
         golf={ x=-1329.8248, y=-33.513905, z=49.581203 },
+        lakepicklenose={ x=2587.2336, y=6167.3735, z=165.12334 },
         luxington={x=3071.25, y=-4729.30, z=15.26},
         mckenzie={ x=2137.5266, y=4799.469, z=40.61362 },
         maze={ x=-75.15735, y=-818.50104, z=326.1752 },
@@ -373,12 +378,6 @@ local VEHICLE_MODEL_SHORTCUTS = {
     ver = "verlierer2",
 }
 
-local vehicles_with_invalid_mods = {
-    "entity3",
-    "issi8",
-    "monstrociti",
-}
-
 local passthrough_commands = {
     {
         command="sprunk",
@@ -510,10 +509,6 @@ local function help_message(pid, message)
             chat.send_targeted_message(pid, pid, replace_command_character(message), false)
         end
     end
-end
-
-local function announce_message(message)
-    chat.send_message(replace_command_character(message), false, true, true)
 end
 
 local function is_in_list(needle, list)
@@ -721,22 +716,14 @@ end
 --- Vehicle Mods
 ---
 
-local function does_vehicle_have_invalid_mods(vehicle)
-    local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(vehicle))
-    for _, banned_model in pairs(vehicles_with_invalid_mods) do
-        if model == banned_model then return true end
-    end
-    return false
-end
-
 local function vehicle_set_mod_max_value(vehicle, vehicle_mod)
-    -- Don't apply max mods to vehicles with invalid mods to avoid crashing players
-    local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
+    local max = entities.get_upgrade_max_value(vehicle, vehicle_mod)
+    --util.log("Setting max mod "..vehicle_mod.." to "..max)
     entities.set_upgrade_value(vehicle, vehicle_mod, max)
 end
 
 local function set_vehicle_mod_random_value(vehicle, vehicle_mod)
-    local max = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, vehicle_mod) - 1
+    local max = entities.get_upgrade_max_value(vehicle, vehicle_mod)
     if max > 0 then
         local rand_value = math.random(-1, max)
         entities.set_upgrade_value(vehicle, vehicle_mod, rand_value)
@@ -744,7 +731,6 @@ local function set_vehicle_mod_random_value(vehicle, vehicle_mod)
 end
 
 local function max_mods(vehicle)
-    if does_vehicle_have_invalid_mods(vehicle) then return end
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, math.random(-1, constants.VEHICLE_MAX_OPTIONS.WINDOW_TINTS))
     for mod_name, mod_number in pairs(constants.VEHICLE_MOD_TYPES) do
@@ -845,7 +831,6 @@ end
 ---
 
 local function shuffle_mods(vehicle)
-    if does_vehicle_have_invalid_mods(vehicle) then return end
     VEHICLE.SET_VEHICLE_MOD_KIT(vehicle, 0)
     VEHICLE.SET_VEHICLE_WINDOW_TINT(vehicle, math.random(-1, constants.VEHICLE_MAX_OPTIONS.WINDOW_TINTS))
     for mod_name, mod_number in pairs(constants.VEHICLE_MOD_TYPES) do
@@ -1284,39 +1269,37 @@ local function gift_vehicle_to_player(pid, vehicle)
     DECORATOR.DECOR_SET_INT(vehicle, "Player_Vehicle", pid_hash)
     DECORATOR.DECOR_SET_INT(vehicle, "Veh_Modded_By_Player", pid_hash)
 
-    help_message(pid, "You may now park this car in your garage. The garage must be full of free cars when you park and replace a free car with this one.")
+    --local interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
+    --local pos = ENTITY.GET_ENTITY_COORDS(ped, true)
+    --local end_time
 
-    local interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
-    local pos = ENTITY.GET_ENTITY_COORDS(ped, true)
-    local end_time
-
-    -- Wait until garage is entered
-    end_time = util.current_time_millis() + 15000
-    repeat
-        interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
-        util.yield()
-    until interior ~= 0 or util.current_time_millis() >= end_time
-
-    memory.write_int(check, 1)
-
-    -- Wait until garage is exited
-    end_time = util.current_time_millis() + 15000
-    repeat
-        interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
-        util.yield()
-    until interior == 0 or util.current_time_millis() >= end_time
-
-    -- Delete invis leftover vehicle
-    for _, veh in pairs(entities.get_all_vehicles_as_handles()) do
-        local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(veh))
-        if model:find(spawned_model) then
-            local veh_pos = ENTITY.GET_ENTITY_COORDS(veh, true)
-            if MISC.GET_DISTANCE_BETWEEN_COORDS(pos.x, pos.y, pos.z, veh_pos.x, veh_pos.y, veh_pos.z, true) < 5.0 then
-                entities.delete_by_handle(veh)
-                break
-            end
-        end
-    end
+    ---- Wait until garage is entered
+    --end_time = util.current_time_millis() + 15000
+    --repeat
+    --    interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
+    --    util.yield()
+    --until interior ~= 0 or util.current_time_millis() >= end_time
+    --
+    --memory.write_int(check, 1)
+    --
+    ---- Wait until garage is exited
+    --end_time = util.current_time_millis() + 15000
+    --repeat
+    --    interior = INTERIOR.GET_INTERIOR_FROM_ENTITY(ped)
+    --    util.yield()
+    --until interior == 0 or util.current_time_millis() >= end_time
+    --
+    ---- Delete invis leftover vehicle
+    --for _, veh in pairs(entities.get_all_vehicles_as_handles()) do
+    --    local model = util.reverse_joaat(ENTITY.GET_ENTITY_MODEL(veh))
+    --    if model:find(spawned_model) then
+    --        local veh_pos = ENTITY.GET_ENTITY_COORDS(veh, true)
+    --        if MISC.GET_DISTANCE_BETWEEN_COORDS(pos.x, pos.y, pos.z, veh_pos.x, veh_pos.y, veh_pos.z, true) < 5.0 then
+    --            entities.delete_by_handle(veh)
+    --            break
+    --        end
+    --    end
+    --end
 
 end
 
@@ -1382,12 +1365,11 @@ end
 -- Help Commands
 
 add_chat_command{
-    command="help",
+    command={"help", "commands"},
     help={
-        "Welcome! Please don't grief others. For help with a specific command say !help <COMMAND>",
-        "SELF commands: !autoheal, !bail, !allguns, !tp, !vip, !unstick, !tpme, !cleanup, !money",
-        "VEHICLE commands: !spawn, !gift, !paint, !mods, !wheels, !shuffle, !tune, !topspeed, !gravity",
-        "!headlights, !neonlights, !wheelcolor, !tires, !livery, !plate, !platetype, !horn, !repair",
+        "Welcome! Please don't grief others. For help with a specific command say !help commandname",
+        "SELF commands: !autoheal !bail !allguns !tp !vip !unstick !tpme !cleanup !money !roulette",
+        "VEHICLE commands: !spawn !gift !paint !mods !wheels !shuffle !tune !fast !repair",
     },
     func=function(pid, commands, this_chat_command)
         if type(commands) == "table" then
@@ -1415,6 +1397,17 @@ add_chat_command{
         "VEHICLE commands: !spawn, !gift, !paint, !mods, !wheels, !shuffle, !tune",
         "!headlights, !neonlights, !wheelcolor, !tires, !livery, !plate, !platetype, !horn, !repair",
     }
+}
+
+add_chat_command{
+    command={"construct", "constructs"},
+    help={
+        "Available constructs: !chongzi !ghostrider !heliburger !meowcycle !op3 !phonebooth !policebarrage",
+        "!potuslimo !sleigh !soccerball !sprunkramp !tacop !tron !targetkart !walmartkart !ufo"
+    },
+    func=function(pid, commands, chat_command)
+        help_message(pid, chat_command.help)
+    end
 }
 
 add_chat_command{
@@ -1455,7 +1448,11 @@ add_chat_command{
 add_chat_command{
     command="gift",
     help={
-       "First fill a garage with FREE cars from Legendary Motor. Use !gift, then drive into garage and REPLACE a free car. For step-by-step instructions use !help gift1"
+        "To permanently add a vehicle to your garage: 1. Use an empty 10-car non-DLC garage. Cheap ones by airport are good.\
+        2. Fill it completely full of Annis Elghy RH8 (or any free car) from Legendary Motor.",
+        "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
+        4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car.",
+        "5. If you have problems drive a car out and back into the garage to reset. If invis cars block the door, use !cleanup or !ramp",
     },
     func=function(pid)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1463,6 +1460,7 @@ add_chat_command{
             help_message(pid, "You must be in a vehicle to use !gift")
         else
             gift_vehicle_to_player(pid, vehicle)
+            help_message(pid, "You may now park this car in a full garage and permanently replace another car. For more help say !help gift")
         end
     end
 }
@@ -2834,38 +2832,44 @@ local function afk_casino_tick()
 end
 
 local next_announcement_time
-
-local function reset_announcement_timer()
-    next_announcement_time = util.current_time_millis() + (config.announce_delay * 60000)
-end
-reset_announcement_timer()
-
 local function announce(announcement)
+    if not announcement.is_enabled then return end
     if announcement.validator and type(announcement.validator) == "function" then
         if not announcement.validator() then
-            util.toast("Skipping invalid announcement: "..announcement.name)
+            --util.toast("Skipping invalid announcement: "..announcement.name)
             return
         end
     end
-    announcement.last_announced = util.current_unix_time_seconds()
+    if next_announcement_time ~= nil and (util.current_time_millis() < next_announcement_time) then
+        util.toast("Skipping flood delayed announcement: "..announcement.name)
+        return
+    end
+    next_announcement_time = util.current_time_millis() + (config.announce_flood_delay * #announcement.messages)
+    announcement.next_announcement_time = util.current_time_millis() + (config.announce_delay * 60000)
     for _, message in pairs(announcement.messages) do
-        announce_message(message)
+        chat.send_message(replace_command_character(message), false, true, true)
+        util.yield(config.announce_flood_delay)
     end
 end
 
-local function announce_to_lobby()
-    for _, announcement in pairs(config.announcements) do
-        announce(announcement)
-    end
-    reset_announcement_timer()
-end
-
-
+local next_announcement_tick_time
 local function announcement_tick()
-    if util.current_time_millis() > next_announcement_time then
-        announce_to_lobby()
+    if not config.is_announcement_enabled then return end
+    if next_announcement_tick_time == nil or util.current_time_millis() > next_announcement_tick_time then
+        next_announcement_tick_time = util.current_time_millis() + config.tick_handler_delay
+        for _, announcement in pairs(config.announcements) do
+            if announcement.next_announcement_time == nil or util.current_time_millis() > announcement.next_announcement_time then
+                announce(announcement)
+            end
+        end
     end
 end
+
+-- Init announcement delay
+for _, announcement in pairs(config.announcements) do
+    announcement.next_announcement_time = util.current_time_millis() + (config.announce_delay * 60000)
+end
+
 
 local function afk_mode_tick()
     if config.afk_mode then
@@ -2876,7 +2880,6 @@ local function afk_mode_tick()
                 find_new_lobby()
             else
                 afk_casino_tick()
-                announcement_tick()
             end
         end
     end
@@ -2906,7 +2909,7 @@ disable_builtin_chat_commands()
 --- Root Menu
 ---
 
-menu.toggle(menu.my_root(), "AFK Mode", {}, "If enabled, you will auto join new lobby when alone.", function(toggle)
+menu.toggle(menu.my_root(), "AFK Mode", {"afk"}, "If enabled, you will auto join new lobby when alone.", function(toggle)
     config.afk_mode = toggle
 end, config.afk_mode)
 
@@ -2947,25 +2950,31 @@ for _, chat_command in pairs(chat_commands) do
 end
 
 menus.announcements = menu.list(menu.my_root(), "Announcements")
+menu.action(menus.announcements, "Announce All", {"announce"}, "Announce all relevant messages", function()
+    for _, announcement in ipairs(config.announcements) do
+        announcement.next_announcement_time = nil
+    end
+end)
+menu.divider(menus.announcements, "Announcements")
 for index, announcement in ipairs(config.announcements) do
     local menu_list = menu.list(menus.announcements, announcement.name, {}, "")
     menu.action(menu_list, "Announce", {}, "Broadcast this announcement to the lobby", function()
-        announce(announcement)
+        announcement.next_announcement_time = nil
     end)
     if announcement.is_enabled == nil then announcement.is_enabled = true end
     menu.toggle(menu_list, "Enabled", {}, "If enabled, announcement will be repeated everytime the delay expires.", function(toggle)
         announcement.is_enabled = toggle
     end, announcement.is_enabled)
     if announcement.delay == nil then announcement.delay = config.announce_delay end
-    menu.slider(menu_list, "Delay", {}, "Time between repeats of this announcement, in minutes.", 15, 120, announcement.delay, 15, function(value)
-        announcement.delay = value
-    end)
+    --menu.slider(menu_list, "Delay", {}, "Time between repeats of this announcement, in minutes.", 15, 120, announcement.delay, 15, function(value)
+    --    announcement.delay = value
+    --end)
     for message_index, message in ipairs(announcement.messages) do
         menu.text_input(menu_list, "Message "..message_index, {"hexascripteditannouncement_"..index.."_"..message_index}, "Edit announcement content", function(value)
             announcement.messages[message_index] = value
         end, message)
     end
-    menu.readonly(menu_list, "Last Announced", announcement.last_announced or "Never")
+    --menu.readonly(menu_list, "Last Announced", announcement.last_announced or "Never")
 end
 
 ---
@@ -3002,6 +3011,9 @@ end, config.afk_mode_in_casino)
 menu.slider(menu_options, "Min Players in Lobby", {}, "If in AFK mode, will try to stay in a lobby with at least this many players.", 0, 30, config.min_num_players, 1, function(val)
     config.min_num_players = val
 end, config.min_num_players)
+menu.toggle(menu_options, "Announcements Enabled", {}, "While enabled announcements about available options will be sent to lobby chat on a regular cadence.", function(toggle)
+    config.is_announcement_enabled = toggle
+end, config.is_announcement_enabled)
 menu.slider(menu_options, "Announce Delay", {}, "Set the time interval for when announce will be triggered, in minutes", 30, 120, config.announce_delay, 15, function(value)
     config.announce_delay = value
 end)
@@ -3033,4 +3045,5 @@ menu.hyperlink(script_meta_menu, "Discord", "https://discord.gg/RF4N7cKz", "Open
 ---
 
 util.create_tick_handler(afk_mode_tick)
+util.create_tick_handler(announcement_tick)
 util.create_tick_handler(delete_old_vehicles_tick)
