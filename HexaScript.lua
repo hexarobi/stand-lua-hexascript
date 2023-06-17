@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b12"
+local SCRIPT_VERSION = "0.17b13"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -157,7 +157,7 @@ config = {
     lobby_mode_index = 1,
     tick_handler_delay = 5000,
     delete_old_vehicles_tick_handler_delay = 1000,
-    is_announcement_enabled = true,
+    is_announcement_enabled = false,
     announce_flood_delay = 5000,
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
@@ -169,7 +169,7 @@ config = {
     announcements = {
         {
             name="Basic Commands",
-            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo !op2 !raiju) Lose cops with !bail Heal with !autoheal Teleport with !tp For more try !help"},
+            messages={"Chat commands are now enabled for you! Spawn any vehicle with !name (Ex: !deluxo !op2 !raiju) Keep them with !gift Lose cops with !bail Heal with !autoheal Teleport with !tp Get more help with !help"},
         },
         {
             name="Roulette",
@@ -184,7 +184,8 @@ config = {
                 "To keep spawned cars: 1. Use an empty 10-car non-DLC garage. Cheap ones by airport are good.\
                 2. Fill it full of Annis Elghy RH8 (or any free car) from Legendary Motor.",
                 "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
-                4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car."
+                4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car.",
+                "5. Visit LS Customs and purchase any modification to get insurance for free."
             },
             is_enabled=false,
         }
@@ -606,16 +607,16 @@ local function force_roulette_area()
     end
 end
 
-local function force_rig_roulette()
-    local rig_roulette_menu = menu.ref_by_path("Online>Quick Progress>Casino>Roulette Outcome")
-    if menu.is_ref_valid(rig_roulette_menu) then
-        if rig_roulette_menu.value ~= 1 then
-            rig_roulette_menu.value = 1
-        end
-    else
-        error("Failed to get command ref to rig roulette")
-    end
-end
+--local function force_rig_roulette()
+--    local rig_roulette_menu = menu.ref_by_path("Online>Quick Progress>Casino>Roulette Outcome")
+--    if menu.is_ref_valid(rig_roulette_menu) then
+--        if rig_roulette_menu.value ~= 1 then
+--            rig_roulette_menu.value = 1
+--        end
+--    else
+--        error("Failed to get command ref to rig roulette")
+--    end
+--end
 
 hexascript.is_player_in_casino = function(pid)
     return is_player_within_dimensions({
@@ -1416,11 +1417,13 @@ add_chat_command{
 add_chat_command{
     command="gift",
     help={
-        "To permanently add a vehicle to your garage: 1. Use an empty 10-car non-DLC garage. Cheap ones by airport are good.\
-        2. Fill it completely full of Annis Elghy RH8 (or any free car) from Legendary Motor.",
+        "To permanently add a vehicle to your garage: \
+        1. Use an empty 10-car non-DLC garage. !tp giftgarage\
+        2. Fill it completely full of Annis Elghy RH8 (or any free car) from Legendary Motor",
         "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
-        4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car.",
-        "5. If you have problems drive a car out and back into the garage to reset. If invis cars block the door, use !cleanup or !ramp",
+        4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car",
+        "5. Visit any LS Customs and purchase any modification and insurance will be included for free \
+        6. If you have problems drive a car out and back into the garage to reset. If invis cars block the door, use !cleanup or !ramp",
     },
     func=function(pid)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -2795,7 +2798,7 @@ local function afk_casino_tick()
     else
         force_roulette_area()
         -- force_rig_roulette()
-        util.request_script_host("casinoroulette")
+        --util.request_script_host("casinoroulette")
     end
 end
 
