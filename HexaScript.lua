@@ -1556,7 +1556,7 @@ add_chat_command{
     func=function(pid, commands)
         -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
-            -503325966,
+            -245642440,
             players.user(),
             4,
             10000, -- wage?
