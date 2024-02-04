@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b13"
+local SCRIPT_VERSION = "0.17b15"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -148,6 +148,7 @@ config = {
     afk_mode = false,
     afk_mode_in_casino = true,
     chat_control_character = "!",
+    send_messages_to_all = false,
     allow_by_default = true,
     allowed_options = {"Default", "Everyone", "Friends", "Crew", "Org/MC", "Me", "Disabled"},
     default_allowed_option_index = 2,
@@ -236,9 +237,10 @@ config = {
     },
     custom_plate_texts ={
         --["-TheEndGame"] = "turdface",
-        ["-TheEndGame"] = {"IMANOOB", "MYSECRET", "NONAME", "OUTATIME", "ND4SPD", "MOVEOVER", "GOFASTER", "KIDDYCAR", "THEBOMB", "KILMEPLS", "IMPOOR", "TOOPOSH", "BLINGING"}
+        ["-TheEndGame"] = {"IMANOOB", "MYSECRET", "NONAME", "OUTATIME", "ND4SPD", "MOVEOVER", "GOFASTER", "KIDDYCAR", "THEBOMB", "KILMEPLS", "IMPOOR", "TOOPOSH", "BLINGING"},
+        ["EndHunter12"] = "EndHuntr",
     },
-    special_players={"Agnetha-", "TonyTrivia", "Hexarobo", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "-TheEndGame", "aTet_sj408", "Rufus_Xavier", "ashwebninja"}
+    special_players={"Agnetha-", "TonyTrivia", "Hexarobo", "Grabula1066", "-Rogue-_", "K4RB0NN1C", "BigTuna76", "0xC167", "ManWithNoName316", "Tobwater09", "-TheEndGame", "aTet_sj408", "Rufus_Xavier", "ashwebninja", "T4c0B3ll90", "CapyBaraTherapy"}
 }
 
 local menus = {}
@@ -383,6 +385,7 @@ local VEHICLE_MODEL_SHORTCUTS = {
     ["300r"] = "r300",
     m100 = "tulip2",
     ver = "verlierer2",
+    lacoureuse = "coureur",
 }
 
 local passthrough_commands = {
@@ -506,14 +509,31 @@ local function replace_command_character(message)
     return message:gsub(" !", " "..chat_control_character)
 end
 
+local function send_message(pid, message)
+    message = replace_command_character(message)
+    if config.send_messages_to_all then
+        message = PLAYER.GET_PLAYER_NAME(pid) .. "> " .. message
+        --chat.send_message(message, false, true, true)
+        local say_command_ref = menu.ref_by_path("Online>Chat>Send Message>Send Message")
+        if menu.is_ref_valid(say_command_ref) then
+            menu.trigger_command(say_command_ref, message)
+        else
+            util.toast("Invalid menu item")
+        end
+    else
+        chat.send_targeted_message(pid, pid, message, false)
+    end
+end
+
 local function help_message(pid, message)
     if pid ~= nil and message ~= nil then
         if (type(message) == "table") then
             for _, message_part in pairs(message) do
-                chat.send_targeted_message(pid, pid, replace_command_character(message_part), false)
+                send_message(pid, message_part)
+                util.yield(6000)
             end
         else
-            chat.send_targeted_message(pid, pid, replace_command_character(message), false)
+            send_message(pid, message)
         end
     end
 end
@@ -1385,7 +1405,7 @@ add_chat_command{
         "The best way to make money is from running missions and heists! It's more fun and satisfying",
         "For a money boost try CEO pay (30k per min) use !vip for Org invite, then !ceopay",
         "For even bigger boost watch for the casino to be rigged, more info: !help roulette",
-        "You can sell !deathbike2 for 1mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
+        "You can sell !deluxo for $3.25mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
     },
     func=function(pid, commands, chat_command)
         help_message(pid, chat_command.help)
@@ -1514,13 +1534,29 @@ add_chat_command{
 --    end
 --}
 
+--void func_7340(int iParam0, int iParam1, var uParam2, var uParam3, var uParam4, var uParam5, var uParam6) // Position - 0x2825DB
+--{
+--struct<10> eventData;
+--
+--eventData = -245642440;
+--eventData.f_1 = PLAYER::PLAYER_ID();
+--eventData.f_2 = iParam1;
+--eventData.f_3 = { uParam2 };
+--func_2139(&(eventData.f_8), &(eventData.f_9));
+--
+--if (!(iParam0 == 0))
+--SCRIPT::SEND_TU_SCRIPT_EVENT(SCRIPT_EVENT_QUEUE_NETWORK, &eventData, 10, iParam0);
+--
+--return;
+--}
+
 add_chat_command{
     command="vip",
     help="Request an org invite, useful for ceopay or VIP at casino.",
     func=function(pid, commands)
         -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
-            -245642440,
+            -503325966,
             players.user(),
             4,
             10000, -- wage?
@@ -1528,8 +1564,8 @@ add_chat_command{
             0,
             0,
             0,
-            memory.read_int(memory.script_global(1924276 + 9)), -- f_8
-            memory.read_int(memory.script_global(1924276 + 10)), -- f_9
+            memory.read_int(memory.script_global(1916087 + 9)), -- f_8
+            memory.read_int(memory.script_global(1916087 + 10)), -- f_9
         })
         help_message(pid, "Org invite sent. Please check your phone to accept invite.")
     end
@@ -2557,6 +2593,21 @@ add_chat_command{
 }
 
 add_chat_command{
+    command="levelup",
+    func=function(pid, commands)
+        local start_rank = players.get_rank(pid)
+        local target_rank = commands[2]
+        if target_rank == nil then target_rank = start_rank + 10 end
+        if target_rank > 120 then target_rank = 120 end
+        help_message(pid, "Attempting to level you up to rank "..target_rank)
+        while (players.get_rank(pid) ~= nil and players.get_rank(pid) < target_rank) do
+            menu.trigger_commands("rp" .. players.get_name(pid))
+            util.yield(3000)
+        end
+    end
+}
+
+add_chat_command{
     command="bb",
     func=function(pid, commands)
         if is_player_special(pid) then
@@ -2724,7 +2775,8 @@ local function is_command_matched(commands, chat_command)
     return false
 end
 
-chat.on_message(function(pid, reserved, message_text, is_team_chat)
+chat.on_message(function(pid, reserved, message_text, is_team_chat, networked, is_auto)
+    if is_auto then return end
     local chat_control_character = control_characters[config.chat_control_character_index]
     if string.starts(message_text, chat_control_character) then
         local commands = strsplit(message_text:lower():sub(2))
