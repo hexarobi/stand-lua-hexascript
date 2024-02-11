@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b15"
+local SCRIPT_VERSION = "0.17b16"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -400,6 +400,11 @@ local passthrough_commands = {
     --"spawnfor",
     --"ecola",
     {
+        command="casino",
+        outbound_command="casinotp",
+        requires_player_name=true,
+    },
+    {
         command="casinotp",
         outbound_command="casinotp",
         requires_player_name=true,
@@ -530,7 +535,7 @@ local function help_message(pid, message)
         if (type(message) == "table") then
             for _, message_part in pairs(message) do
                 send_message(pid, message_part)
-                util.yield(6000)
+                --util.yield(6000)
             end
         else
             send_message(pid, message)
@@ -724,6 +729,7 @@ local function spawn_for_player(pid, vehicle)
 end
 
 local function spawn_vehicle_for_player(model_name, pid, offset)
+    if model_name == nil then return nil end
     local model = util.joaat(model_name)
     if STREAMING.IS_MODEL_VALID(model) and STREAMING.IS_MODEL_A_VEHICLE(model) then
         despawn_for_player(pid)
@@ -1277,6 +1283,9 @@ end
 
 -- Based on GiftVehicle by Mr.Robot
 local function gift_vehicle_to_player(pid, vehicle)
+    --local command_string = "gift " .. players.get_name(pid)
+    --menu.trigger_commands(command_string)
+
     local pid_hash = NETWORK.NETWORK_HASH_FROM_PLAYER_HANDLE(pid)
     local check = memory.script_global(78689)
     memory.write_int(check, 0)
@@ -1356,9 +1365,10 @@ end
 add_chat_command{
     command={"help", "commands"},
     help={
-        "Welcome! Please don't grief others. For help with a specific command say !help commandname",
-        "SELF commands: !autoheal !bail !allguns !tp !vip !unstick !tpme !cleanup !money !roulette",
-        "VEHICLE commands: !spawn !gift !paint !mods !wheels !shuffle !tune !fast !repair",
+        "Welcome! Please don't grief others. For help with a specific command say !help <command>",
+        "!spawn any vehicle by its name (always oneword, no special characters) Ex: !deluxo or !entitymt",
+        "To keep cars, first fill a 10-car garage up with free cars, then use !gift",
+        "More commands: !unstick !tpme !autoheal !bail !allguns !tp !repair !cleanup !paint !mods !wheels !shuffle !tune !fast",
     },
     func=function(pid, commands, this_chat_command)
         if type(commands) == "table" then
@@ -1437,13 +1447,17 @@ add_chat_command{
 add_chat_command{
     command="gift",
     help={
-        "To permanently add a vehicle to your garage: \
-        1. Use an empty 10-car non-DLC garage. !tp giftgarage\
-        2. Fill it completely full of Annis Elghy RH8 (or any free car) from Legendary Motor",
-        "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
-        4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car",
-        "5. Visit any LS Customs and purchase any modification and insurance will be included for free \
-        6. If you have problems drive a car out and back into the garage to reset. If invis cars block the door, use !cleanup or !ramp",
+        --"To keep a car, fill a garage with free cars from phone, then use !gift and replace a free car.",
+        "The !gift command allows you to keep spawned vehicles in your garage permanently. How To Use:",
+        "1. Use a standalone 10 car garage (!tp giftgarage), then on phone find a free car and buy it over and over until the garage is full.",
+        "2. Spawn any car you want to keep (!deluxo) then use !gift, then park in garage and replace a free car.",
+        --"To permanently add a vehicle to your garage: \
+        --1. Use an empty 10-car non-DLC garage. !tp giftgarage\
+        --2. Fill it completely full of Annis Elghy RH8 (or any free car) from Legendary Motor",
+        --"3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus)\
+        --4. Use !gift then drive into your garage. Replace a free car with your spawned car",
+        --"5. Visit any LS Customs and purchase any modification and insurance will be included for free \
+        --6. If you have problems drive a car out and back into the garage to reset. If invis cars block the door, use !cleanup or !ramp",
     },
     func=function(pid)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1459,10 +1473,9 @@ add_chat_command{
 add_chat_command{
     command="gift1",
     help={
-        "TO KEEP SPAWNED CARS: #1 Buy a regular standalone 10-car garage.",
-        "#2 Open phone, Legendary Motorsport, purchase any FREE car (2-door, Annis Elegy RH8)",
-        "#3 Repeat step #2 until your garage is entirely full of FREE cars and you cannot order any more",
-        "Once your garage is completely full, continue to next steps with !help gift2"
+        "#1 Use a non-DLC 10-car garage, to teleport to a good one use !tp giftgarage",
+        "#2 Open phone, Legendary Motorsport, 2-door, sort by price, purchase any FREE car (2-door, Annis Elegy RH8)",
+        "#3 Go back and repeat step #2 until your garage is entirely full of free cars",
     },
     func=function(pid, commands, chat_command)
         help_message(pid, chat_command.help)
@@ -1534,20 +1547,21 @@ add_chat_command{
 --    end
 --}
 
+-- VIP func from pi_menu
 --void func_7340(int iParam0, int iParam1, var uParam2, var uParam3, var uParam4, var uParam5, var uParam6) // Position - 0x2825DB
 --{
---struct<10> eventData;
+--    struct<10> eventData;
 --
---eventData = -245642440;
---eventData.f_1 = PLAYER::PLAYER_ID();
---eventData.f_2 = iParam1;
---eventData.f_3 = { uParam2 };
---func_2139(&(eventData.f_8), &(eventData.f_9));
+--    eventData = -245642440;
+--    eventData.f_1 = PLAYER::PLAYER_ID();
+--    eventData.f_2 = iParam1;
+--    eventData.f_3 = { uParam2 };
+--    func_2139(&(eventData.f_8), &(eventData.f_9));
 --
---if (!(iParam0 == 0))
---SCRIPT::SEND_TU_SCRIPT_EVENT(SCRIPT_EVENT_QUEUE_NETWORK, &eventData, 10, iParam0);
+--    if (!(iParam0 == 0))
+--    SCRIPT::SEND_TU_SCRIPT_EVENT(SCRIPT_EVENT_QUEUE_NETWORK, &eventData, 10, iParam0);
 --
---return;
+--    return;
 --}
 
 add_chat_command{
@@ -1585,7 +1599,7 @@ add_chat_command{
 
 add_chat_command{
     command="spawn",
-    help="Spawn a shuffled vehicle",
+    help="Spawn a vehicle, with random mods and paint. If no vehicle name is supplied it will be random. Vehicle names should be oneword with no special characters. Ex: !deluxo",
     func=function(pid, commands)
         spawn_shuffled_vehicle_for_player(commands[2], pid)
     end
@@ -2514,7 +2528,7 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="bail",
+    command={"bail","nocops"},
     help="Avoid all wanted levels",
     func=function(pid, commands)
         local enabled_string = get_on_off_string(commands[2])
@@ -2599,10 +2613,16 @@ add_chat_command{
         local target_rank = commands[2]
         if target_rank == nil then target_rank = start_rank + 10 end
         if target_rank > 120 then target_rank = 120 end
-        help_message(pid, "Attempting to level you up to rank "..target_rank)
-        while (players.get_rank(pid) ~= nil and players.get_rank(pid) < target_rank) do
-            menu.trigger_commands("rp" .. players.get_name(pid))
-            util.yield(3000)
+        if start_rank < target_rank then
+            help_message(pid, "Attempting to level you up to rank "..target_rank)
+            while (players.get_name(pid) ~= "undiscoveredplayer"
+                    and players.get_rank(pid) ~= nil
+                    and players.get_rank(pid) < target_rank) do
+                menu.trigger_commands("rp" .. players.get_name(pid))
+                util.yield(3000)
+            end
+        else
+            help_message(pid, "All level-based unlocks are available at 120")
         end
     end
 }
