@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b16"
+local SCRIPT_VERSION = "0.17b17"
 local AUTO_UPDATE_BRANCHES = {
     { "main", {}, "More stable, but updated less often.", "main", },
     { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
@@ -495,13 +495,13 @@ end
 local spawnable_names = load_all_spawnable_names_from_dir(SPAWNABLE_DIR)
 for _, spawnable_name in pairs(spawnable_names) do
     table.insert(
-        passthrough_commands,
-        {
-            command=spawnable_name,
-            help="Spawn a "..spawnable_name,
-            outbound_command=spawnable_name,
-            requires_player_name=true,
-        }
+            passthrough_commands,
+            {
+                command=spawnable_name,
+                help="Spawn a "..spawnable_name,
+                outbound_command=spawnable_name,
+                requires_player_name=true,
+            }
     )
 end
 
@@ -526,7 +526,7 @@ local function send_message(pid, message)
             util.toast("Invalid menu item")
         end
     else
-        chat.send_targeted_message(pid, pid, message, false)
+        chat.send_targeted_message(pid, pid, "> "..message, false)
     end
 end
 
@@ -1144,7 +1144,7 @@ local function vehicle_set_plate_type(pid, vehicle, plate_type_num)
     ENTITY.SET_ENTITY_AS_MISSION_ENTITY(vehicle, true, true)
     VEHICLE.SET_VEHICLE_NUMBER_PLATE_TEXT_INDEX(vehicle, plate_type_num)
     help_message(pid, "Plate type set to " .. plate_type_name)
-    end
+end
 
 local function vehicle_set_nameplate(vehicle, pid)
     vehicle_set_plate(vehicle, plateify_text(players.get_name(pid)))
@@ -1245,6 +1245,18 @@ local function strsplit(inputstr, sep)
     return t
 end
 
+local function combine_remaining_commands(commands, start_index)
+    local response = ""
+    for index, command in commands do
+        if index >= start_index then
+            response = response .. command
+        end
+    end
+    -- Strip out any special characters
+    response = response:gsub('[%p%c%s]', '')
+    return response
+end
+
 local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
     if vehicle_model_name == nil or vehicle_model_name == "" then
         vehicle_model_name = vehicles_list[math.random(#vehicles_list)]
@@ -1258,6 +1270,10 @@ local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
             shuffle_vehicle(vehicle)
             vehicle_mods_set_max_performance(vehicle)
             vehicle_set_nameplate(vehicle, pid)
+            -- Assume deathbike is spawned for selling, so max its mods
+            if string.find(vehicle_model_name, "deathbike") then
+                max_mods(vehicle)
+            end
             return false
         end
     end
@@ -1366,7 +1382,7 @@ add_chat_command{
     command={"help", "commands"},
     help={
         "Welcome! Please don't grief others. For help with a specific command say !help <command>",
-        "!spawn any vehicle by its name (always oneword, no special characters) Ex: !deluxo or !entitymt",
+        "!spawn any vehicle by its name Ex: !deluxo !op2",
         "To keep cars, first fill a 10-car garage up with free cars, then use !gift",
         "More commands: !unstick !tpme !autoheal !bail !allguns !tp !repair !cleanup !paint !mods !wheels !shuffle !tune !fast",
     },
@@ -1415,7 +1431,7 @@ add_chat_command{
         "The best way to make money is from running missions and heists! It's more fun and satisfying",
         "For a money boost try CEO pay (30k per min) use !vip for Org invite, then !ceopay",
         "For even bigger boost watch for the casino to be rigged, more info: !help roulette",
-        "You can sell !deluxo for $3.25mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
+        "You can sell !deathbike2 for $1mil but limit sales to 2 per day to avoid any bans, more info: !help gift"
     },
     func=function(pid, commands, chat_command)
         help_message(pid, chat_command.help)
@@ -1601,7 +1617,8 @@ add_chat_command{
     command="spawn",
     help="Spawn a vehicle, with random mods and paint. If no vehicle name is supplied it will be random. Vehicle names should be oneword with no special characters. Ex: !deluxo",
     func=function(pid, commands)
-        spawn_shuffled_vehicle_for_player(commands[2], pid)
+        local spawn_name = combine_remaining_commands(commands, 2)
+        spawn_shuffled_vehicle_for_player(spawn_name, pid)
     end
 }
 
@@ -1729,7 +1746,7 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="mods",
+    command={"mods","mod"},
     help="Set the vehicles mods",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1741,6 +1758,17 @@ add_chat_command{
             else
                 shuffle_mods(vehicle)
             end
+        end
+    end
+}
+
+add_chat_command{
+    command={"maxmods", "maxmod"},
+    help="Set the vehicles mods to max",
+    func=function(pid, commands)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle then
+            max_mods(vehicle)
         end
     end
 }
@@ -2607,12 +2635,15 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="levelup",
+    command={"levelup", "level"},
     func=function(pid, commands)
         local start_rank = players.get_rank(pid)
-        local target_rank = commands[2]
+        local target_rank = tonumber(commands[2])
         if target_rank == nil then target_rank = start_rank + 10 end
         if target_rank > 120 then target_rank = 120 end
+        if start_rank >= 120 then
+            help_message(pid, "All level-based unlocks are available at 120. Cannot level you up any further.")
+        end
         if start_rank < target_rank then
             help_message(pid, "Attempting to level you up to rank "..target_rank)
             while (players.get_name(pid) ~= "undiscoveredplayer"
@@ -2622,7 +2653,7 @@ add_chat_command{
                 util.yield(3000)
             end
         else
-            help_message(pid, "All level-based unlocks are available at 120")
+            help_message(pid, "You are already above rank "..target_rank)
         end
     end
 }
@@ -2808,7 +2839,8 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat, networked, i
                 end
             end
             -- Default command if no others apply
-            spawn_shuffled_vehicle_for_player(commands[1], pid)
+            local spawn_name = combine_remaining_commands(commands, 1)
+            spawn_shuffled_vehicle_for_player(spawn_name, pid)
         end
     end
 end)
