@@ -350,6 +350,8 @@ return {
         ["gauntletinterceptor"]="polgauntlet",
         ["stainerlecruiser"]="police5",
         ["vigerozxconvertible"]="vigero3",
+        ["beejayxl"]="bjxl",
+        ["oppressormk2"]="oppressor2",
     },
 
     VEHICLE_COLORS = {
