@@ -1,5 +1,5 @@
 -- HexaScript Constants
--- v1.3
+-- v1.4
 
 return {
 
@@ -294,6 +294,8 @@ return {
         ["tornadoratrod"]="tornado6",
         ["fieldmaster"]="tractor2",
         ["mobileoperationscenter"]="trailerlarge",
+        ["aagun"]="trailersmall2",
+        ["antiair"]="trailersmall2",
         ["antiaircrafttrailer"]="trailersmall2",
         ["trashmaster"]="trash",
         ["whippetracebike"]="tribike",
