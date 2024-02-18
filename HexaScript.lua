@@ -3,13 +3,13 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b17"
+local SCRIPT_VERSION = "0.17b18"
 local AUTO_UPDATE_BRANCHES = {
-    { "main", {}, "More stable, but updated less often.", "main", },
-    { "dev", {}, "Cutting edge updates, but less stable.", "dev", },
+    {1, "main", {}, "More stable, but updated less often."},
+    {2, "dev", {}, "Cutting edge updates, but less stable."},
 }
 local SELECTED_BRANCH_INDEX = 2
-local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
+local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][2]
 
 ---
 --- Auto-Updater Lib Install
@@ -18,23 +18,27 @@ local selected_branch = AUTO_UPDATE_BRANCHES[SELECTED_BRANCH_INDEX][1]
 -- Auto Updater from https://github.com/hexarobi/stand-lua-auto-updater
 local status, auto_updater = pcall(require, "auto-updater")
 if not status then
-    local auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
-    async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/dev/auto-updater.lua",
-            function(result, headers, status_code)
-                local function parse_auto_update_result(result, headers, status_code)
-                    local error_prefix = "Error downloading auto-updater: "
-                    if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
-                    if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
-                    filesystem.mkdir(filesystem.scripts_dir() .. "lib")
-                    local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
-                    if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
-                    file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
-                end
-                auto_update_complete = parse_auto_update_result(result, headers, status_code)
-            end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
-    async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 40) do util.yield(250) i = i + 1 end
-    if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
-    auto_updater = require("auto-updater")
+    if not async_http.have_access() then
+        util.toast("Failed to install auto-updater. Internet access is disabled. To enable automatic updates, please stop the script then uncheck the `Disable Internet Access` option.")
+    else
+        local auto_update_complete = nil util.toast("Installing auto-updater...", TOAST_ALL)
+        async_http.init("raw.githubusercontent.com", "/hexarobi/stand-lua-auto-updater/main/auto-updater.lua",
+                function(raw_result, raw_headers, raw_status_code)
+                    local function parse_auto_update_result(result, headers, status_code)
+                        local error_prefix = "Error downloading auto-updater: "
+                        if status_code ~= 200 then util.toast(error_prefix..status_code, TOAST_ALL) return false end
+                        if not result or result == "" then util.toast(error_prefix.."Found empty file.", TOAST_ALL) return false end
+                        filesystem.mkdir(filesystem.scripts_dir() .. "lib")
+                        local file = io.open(filesystem.scripts_dir() .. "lib\\auto-updater.lua", "wb")
+                        if file == nil then util.toast(error_prefix.."Could not open file for writing.", TOAST_ALL) return false end
+                        file:write(result) file:close() util.toast("Successfully installed auto-updater lib", TOAST_ALL) return true
+                    end
+                    auto_update_complete = parse_auto_update_result(raw_result, raw_headers, raw_status_code)
+                end, function() util.toast("Error downloading auto-updater lib. Update failed to download.", TOAST_ALL) end)
+        async_http.dispatch() local i = 1 while (auto_update_complete == nil and i < 40) do util.yield(250) i = i + 1 end
+        if auto_update_complete == nil then error("Error downloading auto-updater lib. HTTP Request timeout") end
+        auto_updater = require("auto-updater")
+    end
 end
 if auto_updater == true then error("Invalid auto-updater lib. Please delete your Stand/Lua Scripts/lib/auto-updater.lua and try again") end
 
@@ -138,7 +142,17 @@ end
 --- Config
 ---
 
-local control_characters = {"!", "?", ".", "#", "@", "$", "%", "&", "*"}
+local control_characters = {
+    {1, "!"},
+    {2, "?"},
+    {3, "."},
+    {4, "#"},
+    {5, "@"},
+    {6, "$"},
+    {7, "%"},
+    {8, "&"},
+    {9, "*"},
+}
 
 local state = {}
 local hexascript = {}
@@ -158,7 +172,7 @@ config = {
     lobby_mode_index = 1,
     tick_handler_delay = 5000,
     delete_old_vehicles_tick_handler_delay = 1000,
-    is_announcement_enabled = false,
+    is_auto_announcement_enabled = false,
     announce_flood_delay = 5000,
     announce_delay = 60,
     lobby_created_at = util.current_time_millis(),
@@ -182,11 +196,14 @@ config = {
         {
             name="How to Gift",
             messages={
-                "To keep spawned cars: 1. Use an empty 10-car non-DLC garage. Cheap ones by airport are good.\
-                2. Fill it full of Annis Elghy RH8 (or any free car) from Legendary Motor.",
-                "3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
-                4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car.",
-                "5. Visit LS Customs and purchase any modification to get insurance for free."
+                "For anyone that wants free cars, start with a standalone 10 car garage (!tp giftgarage) and fill it with any free car from phone.",
+                "Then spawn your car with !name (!deathbike2) and use !gift to replace with spawned car.",
+
+                --"To keep spawned cars: 1. Use an empty 10-car non-DLC garage. Cheap ones by airport are good.\
+                --2. Fill it full of Annis Elghy RH8 (or any free car) from Legendary Motor.",
+                --"3. Spawn a car to keep using !name (Ex: !deluxo !op2 !toreador !ignus !scramjet !krieger !calico !jugular)\
+                --4. Use !gift then drive into your garage. Choose to replace a free car with your spawned car.",
+                --"5. Visit LS Customs and purchase any modification to get insurance for free."
             },
             is_enabled=false,
         }
@@ -194,6 +211,7 @@ config = {
     large_vehicles = {
         "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol", "blimp", "blimp2", "blimp3",
     },
+    allow_teleport_on_foot = true,
     teleport_map = {
         ["8bit"]={ x=-623.96313, y=278.97998, z=81.24377 },
         airport={ x=-1087.7434, y=-3015.6057, z=13.940606 },
@@ -209,7 +227,7 @@ config = {
         giftgarage={ x=-1078.4542, y=-2229.311, z=12.994034 },
         golf={ x=-1329.8248, y=-33.513905, z=49.581203 },
         lakepicklenose={ x=2587.2336, y=6167.3735, z=165.12334 },
-        luxington={x=3071.25, y=-4729.30, z=15.26},
+        luxington={ x=3071.25, y=-4729.30, z=15.26 },
         mckenzie={ x=2137.5266, y=4799.469, z=40.61362 },
         maze={ x=-75.15735, y=-818.50104, z=326.1752 },
         observatory={ x=-408.3328, y=1179.3496, z=325.6197 },
@@ -246,10 +264,18 @@ config = {
 local menus = {}
 
 local lobby_modes = {
-    { "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped.", "gopub" },
-    { "New", {}, "Create a new empty public session.", "gosolopub" },
-    { "Join Friend", {}, "Join a friends session.", "go joinafriend" },
-    { "Friends Only", {}, "Create a new closed friends only session.", "go closedfriend" },
+    { 1, "Public", {}, "Join an existing public lobby. Will often rejoin the previous session after being dropped." },
+    { 2, "New", {}, "Create a new empty public session." },
+    { 3, "Join Friend", {}, "Join a friends session." },
+    { 4, "Friends Only", {}, "Create a new closed friends only session." },
+    { 5, "Join Crew", {}, "Create a new closed friends only session." },
+}
+local lobby_mode_commands = {
+    { 1, "gopub" },
+    { 2, "gosolopub" },
+    { 3, "gojoinafriend" },
+    { 4, "goclosedfriend" },
+    { 5, "gojoinacrew" },
 }
 
 local VEHICLE_MODEL_SHORTCUTS = {
@@ -277,6 +303,8 @@ local VEHICLE_MODEL_SHORTCUTS = {
     hellfire = "gauntlet4",
     luxordeluxe = "luxor2",
     swiftdeluxe = "swift2",
+    aagun = "trailersmall2",
+    antiair = "trailersmall2",
     antiaircraft = "trailersmall2",
     superdiamond = "superd",
     zz8 = "ruiner4",
@@ -472,7 +500,7 @@ local function load_spawnable_names_from_dir(directory)
     local spawnable_names = {}
     for _, filepath in ipairs(filesystem.list_files(directory)) do
         if not filesystem.is_dir(filepath) then
-            local _, filename, ext = string.match(filepath, "(.-)([^\\/]-%.?)[.]([^%.\\/]*)$")
+            local index, filename, ext = string.match(filepath, "(.-)([^\\/]-%.?)[.]([^%.\\/]*)$")
             table.insert(spawnable_names, filename)
         end
     end
@@ -484,7 +512,7 @@ local function load_all_spawnable_names_from_dir(directory)
     local spawnable_names = load_spawnable_names_from_dir(directory)
     for _, filepath in ipairs(filesystem.list_files(directory)) do
         if filesystem.is_dir(filepath) then
-            for _, construct_plan_file in pairs(load_all_spawnable_names_from_dir(filepath)) do
+            for index, construct_plan_file in pairs(load_all_spawnable_names_from_dir(filepath)) do
                 table.insert(spawnable_names, construct_plan_file)
             end
         end
@@ -510,14 +538,14 @@ end
 ---
 
 local function replace_command_character(message)
-    local chat_control_character = control_characters[config.chat_control_character_index]
+    local chat_control_character = control_characters[config.chat_control_character_index][2]
     return message:gsub(" !", " "..chat_control_character)
 end
 
 local function send_message(pid, message)
     message = replace_command_character(message)
     if config.send_messages_to_all then
-        message = PLAYER.GET_PLAYER_NAME(pid) .. "> " .. message
+        message = PLAYER.GET_PLAYER_NAME(pid) .. " " .. message
         --chat.send_message(message, false, true, true)
         local say_command_ref = menu.ref_by_path("Online>Chat>Send Message>Send Message")
         if menu.is_ref_valid(say_command_ref) then
@@ -526,7 +554,7 @@ local function send_message(pid, message)
             util.toast("Invalid menu item")
         end
     else
-        chat.send_targeted_message(pid, pid, "> "..message, false)
+        chat.send_targeted_message(pid, pid, message, false)
     end
 end
 
@@ -603,6 +631,7 @@ end
 ---
 --- Casino AFK Mode
 ---
+
 
 local function is_player_within_dimensions(dimensions, pid)
     if pid == nil then pid = players.user_ped() end
@@ -741,6 +770,7 @@ local function spawn_vehicle_for_player(model_name, pid, offset)
         local vehicle = entities.create_vehicle(model, pos, heading)
         STREAMING.SET_MODEL_AS_NO_LONGER_NEEDED(model)
         spawn_for_player(pid, vehicle)
+        help_message(pid, "Spawning "..model_name)
         return vehicle
     end
 end
@@ -912,6 +942,9 @@ local function shuffle_wheels(vehicle, pid, commands)
         commands[2] = "benny"
         commands[3] = "106"
         VEHICLE.SET_VEHICLE_EXTRA_COLOURS(vehicle, 0, 111)
+    end
+    if commands and commands[2] == "stock" and commands[3] == nil then
+        commands[3] = "-1"
     end
     if commands and commands[2] then
         wheel_type = constants.VEHICLE_WHEEL_TYPES[commands[2]:upper()]
@@ -1295,6 +1328,18 @@ local function teleport_vehicle_to_coords(vehicle, x, y, z)
     request_control(vehicle)
     ENTITY.SET_ENTITY_COORDS(vehicle, x, y, z)
     VEHICLE.SET_VEHICLE_ON_GROUND_PROPERLY(vehicle, 5)
+end
+
+local function teleport_player_to_coords(pid, x, y, z)
+    --help_message(pid, "teleporting..")
+    local old_x, old_y, old_z = players.get_waypoint(players.user())
+    util.set_waypoint({x=x, y=y, z=z})
+    menu.trigger_commands("wpsummon"..players.get_name(pid))
+    if old_x ~= 0 or old_y ~= 0 then
+        util.set_waypoint({x=old_x, y=old_y, z=old_z})
+    else
+        HUD.SET_WAYPOINT_OFF()
+    end
 end
 
 -- Based on GiftVehicle by Mr.Robot
@@ -2456,11 +2501,6 @@ add_chat_command{
             help_message(pid, "Teleport locations: "..table.concat(get_table_keys(config.teleport_map), ", "))
             return
         end
-        local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle == 0 then
-            help_message(pid, "You must be inside a vehicle to teleport")
-            return
-        end
         local teleport_coords
         if command == nil then
             local x, y, z, b = players.get_waypoint(pid)
@@ -2478,9 +2518,22 @@ add_chat_command{
         end
         if teleport_coords == nil then
             help_message(pid, "To teleport, either select a waypoint, or include a location or player name. For a list of locations try !tp list")
-        else
-            teleport_vehicle_to_coords(vehicle, teleport_coords.x, teleport_coords.y, teleport_coords.z)
+            return
         end
+
+        --teleport_player_to_coords(pid, teleport_coords.x, teleport_coords.y, teleport_coords.z)
+        local vehicle = get_player_vehicle_in_control(pid)
+        if vehicle > 0 then
+            teleport_vehicle_to_coords(vehicle, teleport_coords.x, teleport_coords.y, teleport_coords.z)
+        else
+            if config.allow_teleport_on_foot then
+                teleport_player_to_coords(pid, teleport_coords.x, teleport_coords.y, teleport_coords.z)
+            else
+                help_message(pid, "You must be inside a vehicle to teleport")
+                return
+            end
+        end
+
     end
 }
 
@@ -2829,7 +2882,7 @@ end
 chat.on_message(function(pid, reserved, message_text, is_team_chat, networked, is_auto)
     if is_auto then return end
     local chat_control_character = control_characters[config.chat_control_character_index]
-    if string.starts(message_text, chat_control_character) then
+    if string.starts(message_text, chat_control_character[2]) then
         local commands = strsplit(message_text:lower():sub(2))
         if is_user_allowed_to_issue_chat_command(pid, commands) then
             for _, chat_command in ipairs(chat_commands) do
@@ -2864,8 +2917,7 @@ end
 
 local function find_new_lobby()
     config.lobby_created_at = util.current_time_millis()
-    local lobby_mode = lobby_modes[config.lobby_mode_index]
-    menu.trigger_commands(lobby_mode[4])
+    menu.trigger_commands(lobby_mode_commands[config.lobby_mode_index][2])
 end
 
 local function enter_casino()
@@ -2929,7 +2981,7 @@ end
 
 local next_announcement_tick_time
 local function announcement_tick()
-    if not config.is_announcement_enabled then return end
+    if not config.is_auto_announcement_enabled then return end
     if next_announcement_tick_time == nil or util.current_time_millis() > next_announcement_tick_time then
         next_announcement_tick_time = util.current_time_millis() + config.tick_handler_delay
         for _, announcement in pairs(config.announcements) do
@@ -2984,7 +3036,7 @@ disable_builtin_chat_commands()
 --- Root Menu
 ---
 
-menu.toggle(menu.my_root(), "AFK Mode", {"afk"}, "If enabled, you will auto join new lobby when alone.", function(toggle)
+menu.toggle(menu.my_root(), "AFK Mode", {"afk"}, "When enabled, will attempt to keep you in an active lobby.", function(toggle)
     config.afk_mode = toggle
 end, config.afk_mode)
 
@@ -3035,6 +3087,7 @@ for index, announcement in ipairs(config.announcements) do
     local menu_list = menu.list(menus.announcements, announcement.name, {}, "")
     menu.action(menu_list, "Announce", {}, "Broadcast this announcement to the lobby", function()
         announcement.next_announcement_time = nil
+        announce(announcement)
     end)
     if announcement.is_enabled == nil then announcement.is_enabled = true end
     menu.toggle(menu_list, "Enabled", {}, "If enabled, announcement will be repeated everytime the delay expires.", function(toggle)
@@ -3077,6 +3130,7 @@ for _, large_vehicle in pairs(config.large_vehicles) do
     end, state.allowed_large_vehicles[large_vehicle])
 end
 
+menu.divider(menu_options, "AFK Options")
 menu.list_select(menu_options, "AFK Lobby Type", {}, "When in AFK mode and alone in a lobby, what type of lobby should you switch to.", lobby_modes, config.lobby_mode_index, function(index)
     config.lobby_mode_index = index
 end)
@@ -3086,9 +3140,10 @@ end, config.afk_mode_in_casino)
 menu.slider(menu_options, "Min Players in Lobby", {}, "If in AFK mode, will try to stay in a lobby with at least this many players.", 0, 30, config.min_num_players, 1, function(val)
     config.min_num_players = val
 end, config.min_num_players)
-menu.toggle(menu_options, "Announcements Enabled", {}, "While enabled announcements about available options will be sent to lobby chat on a regular cadence.", function(toggle)
-    config.is_announcement_enabled = toggle
-end, config.is_announcement_enabled)
+menu.divider(menu_options, "Announcement Options")
+menu.toggle(menu_options, "Auto-Announcements", {}, "While enabled announcements about available options will be sent to lobby chat on a regular cadence.", function(toggle)
+    config.is_auto_announcement_enabled = toggle
+end, config.is_auto_announcement_enabled)
 menu.slider(menu_options, "Announce Delay", {}, "Set the time interval for when announce will be triggered, in minutes", 30, 120, config.announce_delay, 15, function(value)
     config.announce_delay = value
 end)
@@ -3097,7 +3152,7 @@ end)
 --- Script Meta Menu
 ---
 
-local script_meta_menu = menu.list(menu.my_root(), "Script Meta")
+local script_meta_menu = menu.list(menu.my_root(), "About HexaScript")
 menu.divider(script_meta_menu, "HexaScript")
 menu.readonly(script_meta_menu, "Version", SCRIPT_VERSION)
 menu.list_select(script_meta_menu, "Release Branch", {}, "Switch from main to dev to get cutting edge updates, but also potentially more bugs.", AUTO_UPDATE_BRANCHES, SELECTED_BRANCH_INDEX, function(index, menu_name, previous_option, click_type)
