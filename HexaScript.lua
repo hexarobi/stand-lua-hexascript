@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b18"
+local SCRIPT_VERSION = "0.17b19"
 local AUTO_UPDATE_BRANCHES = {
     {1, "main", {}, "More stable, but updated less often."},
     {2, "dev", {}, "Cutting edge updates, but less stable."},
@@ -211,7 +211,7 @@ config = {
     large_vehicles = {
         "kosatka", "jet", "cargoplane", "cargoplane2", "tug", "alkonost", "titan", "volatol", "blimp", "blimp2", "blimp3",
     },
-    allow_teleport_on_foot = true,
+    allow_teleport_on_foot = false,
     teleport_map = {
         ["8bit"]={ x=-623.96313, y=278.97998, z=81.24377 },
         airport={ x=-1087.7434, y=-3015.6057, z=13.940606 },
@@ -928,10 +928,11 @@ end
 
 local function shuffle_horn(vehicle, pid, horn_number)
     local max_horn_number = VEHICLE.GET_NUM_VEHICLE_MODS(vehicle, constants.VEHICLE_MOD_TYPES.MOD_HORNS) - 1
+    horn_number = tonumber(horn_number)
     if horn_number == nil then
         horn_number = math.random(-1, max_horn_number)
     end
-    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_HORNS, tonumber(horn_number))
+    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_HORNS, horn_number)
     help_message(pid, "Set vehicle horn to "..horn_number.." (of "..max_horn_number..")")
 end
 
