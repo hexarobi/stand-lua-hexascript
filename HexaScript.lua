@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17"
+local SCRIPT_VERSION = "0.17.1"
 local AUTO_UPDATE_BRANCHES = {
     {1, "main", {}, "More stable, but updated less often."},
     {2, "dev", {}, "Cutting edge updates, but less stable."},
@@ -87,13 +87,13 @@ local auto_update_config = {
         --    verify_file_begins_with="--",
         --    is_required=true,
         --},
-        --{
-        --    name="inspect",
-        --    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
-        --    script_relpath="lib/inspect.lua",
-        --    verify_file_begins_with="local",
-        --    is_required=true,
-        --},
+        {
+            name="inspect",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
+            script_relpath="lib/inspect.lua",
+            verify_file_begins_with="local",
+            is_required=true,
+        },
     }
 }
 auto_updater.run_auto_update(auto_update_config)
@@ -425,16 +425,22 @@ local passthrough_commands = {
     },
     "sprunkify",
     "sprunkrain",
+    "trivia",
     --"spawnfor",
     --"ecola",
     {
-        command="casino",
+        command={"casino", "casinotp"},
         outbound_command="casinotp",
         requires_player_name=true,
     },
+    --{
+    --    command="casinotp",
+    --    outbound_command="casinotp",
+    --    requires_player_name=true,
+    --},
     {
-        command="casinotp",
-        outbound_command="casinotp",
+        command={"givecollectibles", "collectibles"},
+        outbound_command="givecollectibles",
         requires_player_name=true,
     },
     --{
@@ -2810,18 +2816,23 @@ for _, passthrough_command in passthrough_commands do
     if type(passthrough_command) ~= "table" then
         args = {command=passthrough_command}
     end
-    args.override_action_command = "passthrough"..args.command  -- Prefix pass through commands for uniqueness to avoid loop
-    args.func = function(pid, commands)
-        local command_string = (args.outbound_command or args.command)
-        if pid ~= players.user() or passthrough_command.requires_player_name then
-            command_string = command_string .. " " .. players.get_name(pid)
-        end
-        if commands and commands[2] ~= nil then
-            command_string = command_string .. " " .. commands[2]
-        end
-        menu.trigger_commands(command_string)
-        if passthrough_command.help_message then
-            help_message(pid, passthrough_command.help_message)
+    if type(args.command) ~= "table" then
+        args.command = {args.command}
+    end
+    for _, command in args.command do
+        args.override_action_command = "passthrough"..command  -- Prefix pass through commands for uniqueness to avoid loop
+        args.func = function(pid, commands)
+            local command_string = (args.outbound_command or command)
+            if pid ~= players.user() or passthrough_command.requires_player_name then
+                command_string = command_string .. " " .. players.get_name(pid)
+            end
+            if commands and commands[2] ~= nil then
+                command_string = command_string .. " " .. commands[2]
+            end
+            menu.trigger_commands(command_string)
+            if passthrough_command.help_message then
+                help_message(pid, passthrough_command.help_message)
+            end
         end
     end
     add_chat_command(args)
