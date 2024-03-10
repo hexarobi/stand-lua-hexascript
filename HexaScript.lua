@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.17b19"
+local SCRIPT_VERSION = "0.18b1"
 local AUTO_UPDATE_BRANCHES = {
     {1, "main", {}, "More stable, but updated less often."},
     {2, "dev", {}, "Cutting edge updates, but less stable."},
@@ -68,6 +68,12 @@ local auto_update_config = {
             is_required=true,
         },
         {
+            name="constructor_constants",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/constructor/constants.lua",
+            script_relpath="lib/constructor/constants.lua",
+            verify_file_begins_with="--",
+        },
+        {
             name="constructor_lib",
             source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/constructor/constructor_lib.lua",
             script_relpath="lib/hexascript/constructor_lib.lua",
@@ -87,13 +93,19 @@ local auto_update_config = {
         --    verify_file_begins_with="--",
         --    is_required=true,
         --},
-        --{
-        --    name="inspect",
-        --    source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
-        --    script_relpath="lib/inspect.lua",
-        --    verify_file_begins_with="local",
-        --    is_required=true,
-        --},
+        {
+            name="inspect",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-constructor/main/lib/inspect.lua",
+            script_relpath="lib/inspect.lua",
+            verify_file_begins_with="local",
+            is_required=true,
+        },
+        {
+            name="file_database",
+            source_url="https://raw.githubusercontent.com/hexarobi/stand-lua-hexascript/main/lib/file_database.lua",
+            script_relpath="lib/file_database.lua",
+            is_required=true,
+        },
     }
 }
 auto_updater.run_auto_update(auto_update_config)
@@ -116,8 +128,10 @@ end
 
 local constants = libs.constants
 local colorsRGB = libs.colors
---local inspect = libs.inspect
+local inspect = libs.inspect
 local constructor_lib = libs.constructor_lib
+local db = libs.file_database
+db.set_name("hexascript")
 
 util.require_natives(1672190175)
 
@@ -159,6 +173,7 @@ local hexascript = {}
 local config
 
 config = {
+    debug = false,
     afk_mode = false,
     afk_mode_in_casino = true,
     chat_control_character = "!",
@@ -425,16 +440,22 @@ local passthrough_commands = {
     },
     "sprunkify",
     "sprunkrain",
+    "trivia",
     --"spawnfor",
     --"ecola",
     {
-        command="casino",
+        command={"casino", "casinotp"},
         outbound_command="casinotp",
         requires_player_name=true,
     },
+    --{
+    --    command="casinotp",
+    --    outbound_command="casinotp",
+    --    requires_player_name=true,
+    --},
     {
-        command="casinotp",
-        outbound_command="casinotp",
+        command={"givecollectibles", "collectibles"},
+        outbound_command="givecollectibles",
         requires_player_name=true,
     },
     --{
@@ -447,6 +468,12 @@ local passthrough_commands = {
 ---
 --- Utils
 ---
+
+local function debug_log(message)
+    if config.debug then
+        util.log("[HexaScript] "..message)
+    end
+end
 
 -- From https://stackoverflow.com/questions/12394841/safely-remove-items-from-an-array-table-while-iterating
 local function array_remove(t, fnKeep)
@@ -922,7 +949,9 @@ local function shuffle_livery(vehicle, pid, livery_number)
     if livery_number == nil then
         livery_number = math.random(-1, max_livery_number)
     end
-    entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, tonumber(livery_number))
+    if livery_number ~= nil then
+        entities.set_upgrade_value(vehicle, constants.VEHICLE_MOD_TYPES.MOD_LIVERY, tonumber(livery_number))
+    end
     help_message(pid, "Set vehicle livery to "..livery_number)
 end
 
@@ -1630,6 +1659,13 @@ add_chat_command{
     command="vip",
     help="Request an org invite, useful for ceopay or VIP at casino.",
     func=function(pid, commands)
+        if players.get_org_type(players.user()) == -1 then
+            menu.trigger_commands("ceostart")
+            util.yield(100)
+            if players.get_org_type(players.user()) == -1 then
+                help_message(pid, "Sorry, VIP is not available right now.")
+            end
+        end
         -- Thanks to Totaw Annihiwation for this script event! // Position - 0x2725D7
         util.trigger_script_event(1 << pid, {
             -245642440,
@@ -1739,7 +1775,7 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="paint",
+    command={"paint", "color"},
     help={
         "Sets your vehicle paint. Allows for color names and paint type options",
         "Paint types: NORMAL, METALLIC, PEARL, MATTE, METAL, CHROME",
@@ -1809,7 +1845,7 @@ add_chat_command{
 }
 
 add_chat_command{
-    command={"maxmods", "maxmod"},
+    command={"maxmods", "modsmax"},
     help="Set the vehicles mods to max",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -1924,7 +1960,7 @@ add_chat_command{
 }
 
 add_chat_command{
-    command="neonlights",
+    command={"neonlights", "underglow"},
     help="Set the vehicle neon lights color",
     func=function(pid, commands)
         local vehicle = get_player_vehicle_in_control(pid)
@@ -2425,38 +2461,38 @@ add_chat_command{
     end
 }
 
-local pop_multiplier_id
-add_chat_command{
-    command="traffic",
-    help="Sets traffic on or off for the entire lobby",
-    func=function(pid, commands)
-        local enabled_string
-        local vehicle_multiplier = tonumber(commands[2])
-        if vehicle_multiplier == nil then
-            enabled_string = get_on_off_string(commands[2])
-            vehicle_multiplier = 0.0
-        else
-            enabled_string = "OFF"
-        end
-        local enabled = (enabled_string == "ON")
-        if not enabled then
-            if pop_multiplier_id ~= nil then
-                MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
-            end
-            pop_multiplier_id = MISC.ADD_POP_MULTIPLIER_SPHERE(1.1, 1.1, 1.1, 15000.0, 0.0, vehicle_multiplier, false, true)
-            MISC.CLEAR_AREA(1.1, 1.1, 1.1, 19999.9, true, false, false, true)
-            help_message(pid, "Traffic vehicle multiplier set to "..vehicle_multiplier)
-        else
-            MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
-            help_message(pid, "Traffic on for lobby")
-        end
-    end
-}
+--local pop_multiplier_id
+--add_chat_command{
+--    command="traffic",
+--    help="Sets traffic on or off for the entire lobby",
+--    func=function(pid, commands)
+--        local enabled_string
+--        local vehicle_multiplier = tonumber(commands[2])
+--        if vehicle_multiplier == nil then
+--            enabled_string = get_on_off_string(commands[2])
+--            vehicle_multiplier = 0.0
+--        else
+--            enabled_string = "OFF"
+--        end
+--        local enabled = (enabled_string == "ON")
+--        if not enabled then
+--            if pop_multiplier_id ~= nil then
+--                MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
+--            end
+--            pop_multiplier_id = MISC.ADD_POP_MULTIPLIER_SPHERE(1.1, 1.1, 1.1, 15000.0, 0.0, vehicle_multiplier, false, true)
+--            MISC.CLEAR_AREA(1.1, 1.1, 1.1, 19999.9, true, false, false, true)
+--            help_message(pid, "Traffic vehicle multiplier set to "..vehicle_multiplier)
+--        else
+--            MISC.REMOVE_POP_MULTIPLIER_SPHERE(pop_multiplier_id, false)
+--            help_message(pid, "Traffic on for lobby")
+--        end
+--    end
+--}
 
 -- Self Commands
 
 add_chat_command{
-    command="tpme",
+    command={"escape","tpme"},
     help="Teleport to a nearby apartment. Good for when stuck in loading screens",
     func=function(pid, commands)
         menu.trigger_commands("aptme " .. players.get_name(pid))
@@ -2524,7 +2560,7 @@ add_chat_command{
 
         --teleport_player_to_coords(pid, teleport_coords.x, teleport_coords.y, teleport_coords.z)
         local vehicle = get_player_vehicle_in_control(pid)
-        if vehicle > 0 then
+        if vehicle != nil and vehicle > 0 then
             teleport_vehicle_to_coords(vehicle, teleport_coords.x, teleport_coords.y, teleport_coords.z)
         else
             if config.allow_teleport_on_foot then
@@ -2810,18 +2846,23 @@ for _, passthrough_command in passthrough_commands do
     if type(passthrough_command) ~= "table" then
         args = {command=passthrough_command}
     end
-    args.override_action_command = "passthrough"..args.command  -- Prefix pass through commands for uniqueness to avoid loop
-    args.func = function(pid, commands)
-        local command_string = (args.outbound_command or args.command)
-        if pid ~= players.user() or passthrough_command.requires_player_name then
-            command_string = command_string .. " " .. players.get_name(pid)
-        end
-        if commands and commands[2] ~= nil then
-            command_string = command_string .. " " .. commands[2]
-        end
-        menu.trigger_commands(command_string)
-        if passthrough_command.help_message then
-            help_message(pid, passthrough_command.help_message)
+    if type(args.command) ~= "table" then
+        args.command = {args.command}
+    end
+    for _, command in args.command do
+        args.override_action_command = "passthrough"..command  -- Prefix pass through commands for uniqueness to avoid loop
+        args.func = function(pid, commands)
+            local command_string = (args.outbound_command or command)
+            if pid ~= players.user() or passthrough_command.requires_player_name then
+                command_string = command_string .. " " .. players.get_name(pid)
+            end
+            if commands and commands[2] ~= nil then
+                command_string = command_string .. " " .. commands[2]
+            end
+            menu.trigger_commands(command_string)
+            if passthrough_command.help_message then
+                help_message(pid, passthrough_command.help_message)
+            end
         end
     end
     add_chat_command(args)
@@ -2862,8 +2903,42 @@ local function is_user_allowed_to_issue_chat_command(pid, commands)
 end
 
 ---
+--- User Database
+---
+
+local user_db = {}
+
+user_db.load_user = function(pid)
+    local player_name = players.get_name(pid)
+    local user_data = db.load_data(player_name)
+    return user_db.apply_default_user_data(user_data)
+end
+
+user_db.save_user = function(pid, user_data)
+    db.save_data(players.get_name(pid), user_data)
+end
+
+user_db.apply_default_user_data = function(user_data)
+    if user_data == nil then user_data = {} end
+    if user_data.num_commands == nil then user_data.num_commands = 0 end
+    if user_data.first_command_at == nil then user_data.first_command_at = util.current_unix_time_seconds() end
+    return user_data
+end
+
+---
 --- Chat Handler
 ---
+
+local function log_user_command(pid, chat_command)
+    local command_name = chat_command.command
+    if type(command_name) == "table" then command_name = command_name[1] end
+    local data = user_db.load_user(pid)
+    data.num_commands = data.num_commands + 1
+    data.last_command = command_name
+    data.last_command_at = util.current_unix_time_seconds()
+    user_db.save_user(pid, data)
+    --debug_log("Updated user "..players.get_name(pid))
+end
 
 local function is_command_matched(commands, chat_command)
     if type(chat_command.command) == "table" then
@@ -2889,6 +2964,7 @@ chat.on_message(function(pid, reserved, message_text, is_team_chat, networked, i
             for _, chat_command in ipairs(chat_commands) do
                 if chat_command.is_enabled and is_command_matched(commands, chat_command) and chat_command.func then
                     chat_command.func(pid, commands, chat_command)
+                    log_user_command(pid, chat_command)
                     return
                 end
             end
