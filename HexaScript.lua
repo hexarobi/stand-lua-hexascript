@@ -3,7 +3,7 @@
 -- Save this file in `Stand/Lua Scripts`
 -- by Hexarobi
 
-local SCRIPT_VERSION = "0.18b1"
+local SCRIPT_VERSION = "0.18b2"
 local AUTO_UPDATE_BRANCHES = {
     {1, "main", {}, "More stable, but updated less often."},
     {2, "dev", {}, "Cutting edge updates, but less stable."},
@@ -170,6 +170,7 @@ local control_characters = {
 
 local state = {}
 local hexascript = {}
+local chat_commands = {}
 local config
 
 config = {
@@ -1321,6 +1322,8 @@ local function combine_remaining_commands(commands, start_index)
 end
 
 local function spawn_shuffled_vehicle_for_player(vehicle_model_name, pid)
+    local chat_command = hexascript.find_chat_command(chat_commands, "spawn")
+    if not chat_command.is_enabled then return false end
     if vehicle_model_name == nil or vehicle_model_name == "" then
         vehicle_model_name = vehicles_list[math.random(#vehicles_list)]
         --help_message(pid, "Spawning "..vehicle_model_name)
@@ -1444,8 +1447,6 @@ local function get_menu_action_help(chat_command_options)
     end
     return chat_command_options.help
 end
-
-local chat_commands = {}
 
 local function add_chat_command(chat_command_options)
     table.insert(chat_commands, chat_command_options)
@@ -2953,6 +2954,19 @@ local function is_command_matched(commands, chat_command)
         end
     end
     return false
+end
+
+hexascript.find_chat_command = function(chat_commands, raw_command)
+    for _, chat_command in ipairs(chat_commands) do
+        if type(chat_command.command) ~= "table" then
+            chat_command.command = {chat_command.command}
+        end
+        for _, command in chat_command.command do
+            if command:lower() == raw_command:lower() then
+                return chat_command
+            end
+        end
+    end
 end
 
 chat.on_message(function(pid, reserved, message_text, is_team_chat, networked, is_auto)
